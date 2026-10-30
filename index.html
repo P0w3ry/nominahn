@@ -102,6 +102,7 @@ tr.tot td { background: var(--accent-soft); }
 .lnk { background: none; border: 0; padding: 0; font: inherit; color: var(--accent-text); cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
 .acts { white-space: nowrap; text-align: right; }
 .pt { min-width: 980px; } .nt { min-width: 1100px; }
+.nt th:first-child, .nt td:first-child { min-width: 260px; white-space: nowrap; }
 .dgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
 .dgrid h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; }
 dl { margin: 0 0 12px; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 13px; }
@@ -314,6 +315,7 @@ const fmt = n => num(n).toLocaleString('en-US', { minimumFractionDigits: 2, maxi
 const ymKey = (y, m) => y + '-' + String(m).padStart(2, '0');
 const uid = () => 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const digits = s => String(s || '').replace(/\D/g, '');
+const idnFix = s => { const d = digits(s); return d.length === 12 ? '0' + d : d; };
 const fmtId = s => { const d = digits(s); return d.length === 13 ? d.slice(0, 4) + '-' + d.slice(4, 8) + '-' + d.slice(8) : (s || ''); };
 const fmtFecha = i => { const d = parseISO(i); return d ? String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear() : ''; };
 const pct = n => (Math.round(num(n) * 10000) / 100) + '%';
@@ -653,9 +655,12 @@ function plantillaXlsx() {
   const w2 = XLSX.utils.aoa_to_sheet([NOV_H]); w2['!cols'] = NOV_H.map(h => ({ wch: Math.max(14, h.length + 2) }));
   const ins = [['Cómo llenar la plantilla de NóminaHN'], [''], ['Hoja Empleados: una fila por empleado. Borra las filas que no uses.'], ['Hoja Novedades: horas extra, bonos y ausencias del mes seleccionado en la app. Se busca al empleado por su identidad.'], [''],
     ['Columna', 'Qué escribir', 'Ejemplo'],
-    ['Nombre completo', 'Nombre y apellidos', 'María López Pérez'], ['Identidad', '13 dígitos, con o sin guiones', '0801-1990-12345'], ['Fecha de ingreso', 'Año-mes-día', '2024-03-15'], ['Salario base mensual', 'En lempiras, sin símbolo', '15200'],
+    ['Nombre completo', 'Nombre y apellidos', 'María López Pérez'], ['Identidad', '13 dígitos, con o sin guiones. La columna ya está en formato Texto para conservar el 0 inicial; si pegas datos de otro lugar, escríbela con guiones.', '0801-1990-12345'], ['Fecha de ingreso', 'Año-mes-día', '2024-03-15'], ['Salario base mensual', 'En lempiras, sin símbolo', '15200'],
     ['Jornada', 'Diurna, Nocturna o Mixta', 'Diurna'], ['Cotiza IHSS / Aporta RAP', 'Sí o No (vacío = Sí)', 'Sí'], ['Gastos médicos anuales', 'Total deducible del año', '0'],
     ['Aumento desde / Salario nuevo', 'Mes del aumento (AAAA-MM) y el nuevo salario', '2026-06 / 17000'], ['Saldo', 'Solo si empiezas a mitad de año: meses ya pagados (0 a 11), ingreso acumulado e ISR retenido', '9 / 136800 / 4100']];
+  // Columna Identidad en formato Texto (filas 2 a 301) para que Excel conserve el 0 inicial
+  const txt = (ws, col) => { const rg = XLSX.utils.decode_range(ws['!ref']); for (let r = 1; r <= 300; r++) ws[XLSX.utils.encode_cell({ r, c: col })] = { t: 's', v: '', z: '@' }; rg.e.r = 300; ws['!ref'] = XLSX.utils.encode_range(rg); };
+  txt(w1, 1); txt(w2, 0);
   const w3 = XLSX.utils.aoa_to_sheet(ins); w3['!cols'] = [{ wch: 34 }, { wch: 70 }, { wch: 22 }];
   XLSX.utils.book_append_sheet(wb, w1, 'Empleados'); XLSX.utils.book_append_sheet(wb, w2, 'Novedades'); XLSX.utils.book_append_sheet(wb, w3, 'Instrucciones');
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -680,10 +685,11 @@ async function importFile(file) {
     const seen = {}, out = [], minimo = num(S.company.salarioMinimo);
     rows.forEach((row, i) => {
       const fila = i + 2, msgs = []; let status = 'ok';
-      const nombre = String(pick(row, ['nombre completo', 'nombre']) || '').trim(), idn = digits(pick(row, ['identidad', 'dni', 'numero de identidad']));
+      const nombre = String(pick(row, ['nombre completo', 'nombre']) || '').trim(), idnRaw = digits(pick(row, ['identidad', 'dni', 'numero de identidad'])), idn = idnFix(idnRaw);
       const ingreso = fechaAny(pick(row, ['fecha de ingreso aaaa mm dd', 'fecha de ingreso', 'ingreso'])), salario = num(pick(row, ['salario base mensual', 'salario base', 'salario']));
       if (!nombre && !idn && !salario) return;
       if (!nombre) { status = 'err'; msgs.push(`Fila ${fila}: falta el nombre.`); }
+      if (idnRaw.length === 12) { if (status === 'ok') status = 'warn'; msgs.push(`Fila ${fila}: la identidad tenía 12 dígitos (Excel quita el 0 inicial); se agregó el 0 al principio. Revísala.`); }
       if (idn.length !== 13) { status = 'err'; msgs.push(`Fila ${fila}: la identidad tiene ${idn.length} dígitos; debe tener 13.`); }
       else if (seen[idn]) { status = 'err'; msgs.push(`Fila ${fila}: la identidad está repetida en el archivo.`); } else seen[idn] = true;
       if (!parseISO(ingreso)) { status = 'err'; msgs.push(`Fila ${fila}: la fecha de ingreso no es válida (usa AAAA-MM-DD).`); }
@@ -700,7 +706,7 @@ async function importFile(file) {
     const nov = [];
     const ns = wb.Sheets['Novedades'];
     if (ns) XLSX.utils.sheet_to_json(ns, { defval: '', raw: true }).forEach((row, i) => {
-      const idn = digits(pick(row, ['identidad'])); if (!idn) return;
+      const idn = idnFix(pick(row, ['identidad'])); if (!idn) return;
       const ok = out.some(r => r.status !== 'err' && r.emp.identidad === idn) || S.employees.some(e => e.identidad === idn);
       const v = { heDiurna: num(pick(row, ['horas extra diurnas'])), heNocturna: num(pick(row, ['horas extra nocturnas'])), heJornadaNocturna: num(pick(row, ['horas extra jornada nocturna'])), bonos: num(pick(row, ['bonos'])), comisiones: num(pick(row, ['comisiones'])), diasAusencia: num(pick(row, ['dias de ausencia sin goce'])), anticipos: num(pick(row, ['anticipos'])), otrasDeducciones: num(pick(row, ['otras deducciones'])) };
       nov.push({ fila: i + 2, identidad: fmtId(idn), idn, status: ok ? 'ok' : 'err', msg: ok ? '' : 'Esa identidad no está entre tus empleados ni en el archivo.', v });
