@@ -71,6 +71,9 @@ input:focus-visible, select:focus-visible, .btn:focus-visible, a:focus-visible, 
 .banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; border-radius: 12px; font-size: 14px; }
 .banner.info { background: var(--info-bg); color: var(--info-t); } .banner.warn { background: var(--warn-bg); color: var(--warn-t); } .banner.err { background: var(--err-bg); color: var(--err-t); display: block; }
 .banner.aviso { font-size: 15px; border: 1px solid currentColor; border-left-width: 5px; }
+a.btn { text-decoration: none; }
+.navs a.man { margin-left: auto; color: var(--muted); }
+.inicio ol { gap: 8px; margin-bottom: 14px; }
 .banner ul { margin: 0; padding-left: 18px; }
 .confirm { display: inline-flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 13px; margin-top: 10px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
@@ -327,14 +330,15 @@ const FLAG = (w, h) => `<svg width="${w}" height="${h}" viewBox="0 0 60 30" role
 // ---------- Estado y guardado ----------
 function makeEmpty() {
   const now = new Date();
-  return { v: 1, demo: false, lastBackup: null, sel: { anio: 2026, mes: now.getMonth() + 1 }, company: { name: '', rtn: '', patronal: '', salarioMinimo: DEFAULT_PARAMS_2026.salarioMinimoPromedio }, params: { 2026: clone(DEFAULT_PARAMS_2026) }, employees: [], novedades: {} };
+  return { v: 1, demo: false, lastBackup: null, sel: { anio: Math.max(2026, now.getFullYear()), mes: now.getMonth() + 1 }, company: { name: '', rtn: '', patronal: '', salarioMinimo: DEFAULT_PARAMS_2026.salarioMinimoPromedio }, params: { 2026: clone(DEFAULT_PARAMS_2026) }, employees: [], novedades: {} };
 }
+const DEMO_CO = 'Comercial Ejemplo, S. de R.L.';
 function makeDemo() {
   const S0 = makeEmpty();
   const now = new Date();
   S0.sel = { anio: 2026, mes: now.getFullYear() === 2026 ? now.getMonth() + 1 : 10 };
   S0.demo = true;
-  S0.company.name = 'Comercial Ejemplo, S. de R.L.';
+  S0.company.name = DEMO_CO;
   const base = { jornada: 'Diurna', ihss: true, rap: true, gastosMedicos: 0, descuentoJudicial: 0, otrasFijas: 0, cambios: [], saldo: null, retiro: '' };
   S0.employees = [
     Object.assign({}, base, { id: uid() + 'a', nombre: 'Marta Elena Reyes', identidad: '0801198501234', cargo: 'Contadora', ingreso: '2019-04-01', salario: 28500 }),
@@ -351,11 +355,12 @@ function makeDemo() {
 }
 let S = null;
 try { const raw = localStorage.getItem(KEY); if (raw) S = JSON.parse(raw); } catch (e) { S = null; }
-if (!S || !Array.isArray(S.employees)) S = makeDemo();
+if (!S || !Array.isArray(S.employees)) S = makeEmpty();
 let storageWarn = false;
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { storageWarn = true; } }
 
 const ui = { form: null, imp: null, exp: {}, confirm: null, decTipo: 13, decEmp: 'all', decVar: false, decProm: 0, pyear: null, stash: null };
+const MANUAL_URL = 'https://claude.ai/artifact/LdeTifHbFr2CVphKcA38Gs';
 const ROUTES = { panel: '1. Panel principal', empleados: '2. Empleados', novedades: '3. Novedades del mes', planilla: '4. Planilla mensual', decimos: '5. Décimo tercer y cuarto mes', parametros: '6. Parámetros y empresa' };
 const NAV = [['panel', 'Panel'], ['empleados', 'Empleados'], ['novedades', 'Novedades'], ['planilla', 'Planilla'], ['decimos', 'Décimos'], ['parametros', 'Parámetros']];
 const route = () => { const r = (location.hash || '#panel').slice(1).split('?')[0]; return ROUTES[r] ? r : 'panel'; };
@@ -402,7 +407,7 @@ function shell(r, body) {
     <label class="sel">Mes <select id="selMes">${MESES.map((n, i) => `<option value="${i + 1}"${S.sel.mes === i + 1 ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
     <label class="sel">Año <select id="selAnio">${years.map(y => `<option${S.sel.anio === y ? ' selected' : ''}>${y}</option>`).join('')}</select></label>
   </div>
-  <nav class="wrap navin" aria-label="Secciones"><div class="navs">${NAV.map(([k, t]) => `<a href="#${k}" class="${k === r ? 'on' : ''}"${k === r ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</div></nav></header>
+  <nav class="wrap navin" aria-label="Secciones"><div class="navs">${NAV.map(([k, t]) => `<a href="#${k}" class="${k === r ? 'on' : ''}"${k === r ? ' aria-current="page"' : ''}>${t}</a>`).join('')}<a class="man" href="${MANUAL_URL}" target="_blank" rel="noopener">Manual de usuario ↗</a></div></nav></header>
   <main class="wrap main">${banners()}${body}</main>
   <div id="toast" class="toast" role="status" hidden></div>`;
 }
@@ -424,7 +429,6 @@ function viewPanel() {
   const M = computeMonth(), t = M.tot;
   const mesTxt = MESES[S.sel.mes - 1] + ' ' + S.sel.anio;
   const alerts = [];
-  if (!S.employees.length) alerts.push(['info', 'Aún no hay empleados. Agrégalos a mano o importa la plantilla de Excel.']);
   M.act.forEach(x => {
     if (x.r.salario < num(S.company.salarioMinimo)) alerts.push(['warn', `${x.emp.nombre} tiene un salario de L ${fmt(x.r.salario)}, menor al mínimo configurado (L ${fmt(S.company.salarioMinimo)}). Revisa el sector o el salario.`]);
     if (x.r.detalleIsr.negativo) alerts.push(['warn', `${x.emp.nombre}: ya se retuvo más ISR del que corresponde a la proyección; este mes retiene L 0.00.`]);
@@ -432,7 +436,11 @@ function viewPanel() {
   M.rows.filter(x => x.r === 'saldo').forEach(x => alerts.push(['info', `${x.emp.nombre}: ${mesTxt} queda cubierto por su saldo inicial.`]));
   const dias = S.lastBackup ? Math.floor((Date.now() - new Date(S.lastBackup).getTime()) / 86400000) : null;
   const k = (l, v, s) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${s}</div></div>`;
+  const inicio = S.employees.length ? '' : `<section class="card inicio"><h2>Bienvenido a NóminaHN</h2><p class="mut">Aún no hay datos. Para calcular tu primera planilla (guía completa en el <a href="${MANUAL_URL}" target="_blank" rel="noopener">manual de usuario</a>):</p>
+    <ol class="plain"><li>En <a href="#parametros">Parámetros y empresa</a>, escribe el nombre de tu empresa y revisa los valores del año.</li><li>En <a href="#empleados">Empleados</a>, agrégalos uno por uno o importa la plantilla de Excel.</li><li>En <a href="#novedades">Novedades</a>, anota las horas extra, bonos y ausencias del mes.</li><li>En <a href="#planilla">Planilla</a>, revisa el cálculo y genera las boletas.</li></ol>
+    <div class="row"><a class="btn" href="#empleados">Agregar empleados</a><button class="btn secondary" data-act="load-demo">Cargar datos de ejemplo</button></div></section>`;
   return `
+  ${inicio}
   <section class="kpis">${t ? [
     k('Planilla bruta', 'L ' + fmt(t.bruto), mesTxt),
     k('Neto a pagar', 'L ' + fmt(t.neto), t.bruto ? (Math.round(t.neto / t.bruto * 1000) / 10) + '% del bruto' : ''),
@@ -809,7 +817,8 @@ document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act]'); if (!t) return;
   const a = t.dataset.act, id = t.dataset.id;
   switch (a) {
-    case 'clear-demo': S = makeEmpty(); S.sel.mes = new Date().getMonth() + 1; save(); ui.imp = ui.form = null; render(); toast('Datos de ejemplo borrados.'); break;
+    case 'clear-demo': { const prev = S, n = makeEmpty(); n.params = prev.params; n.lastBackup = prev.lastBackup; n.sel = prev.sel; if (prev.company.name !== DEMO_CO) n.company = prev.company; S = n; save(); ui.imp = ui.form = null; render(); toast('Datos de ejemplo borrados.'); break; }
+    case 'load-demo': { if (S.employees.length) break; const prev = S, d = makeDemo(); d.params = prev.params; d.lastBackup = prev.lastBackup; if (prev.company.name) d.company = Object.assign({}, prev.company); d.sel = { anio: 2026, mes: 10 }; S = d; save(); ui.imp = ui.form = null; render(); toast('Datos de ejemplo cargados. Puedes borrarlos cuando quieras.'); break; }
     case 'confirm-no': ui.confirm = null; ui.stash = null; render(); break;
     case 'backup': { const blob = JSON.stringify(S, null, 1); S.lastBackup = new Date().toISOString(); save(); await saveFile('nominahn-respaldo-' + S.lastBackup.slice(0, 10) + '.json', blob); render(); break; }
     case 'backup-apply': if (ui.stash) { S = ui.stash; save(); } ui.stash = null; ui.confirm = null; render(); toast('Respaldo importado.'); break;
