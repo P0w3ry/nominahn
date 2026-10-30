@@ -70,6 +70,7 @@ input:focus-visible, select:focus-visible, .btn:focus-visible, a:focus-visible, 
 .chip.ok { background: var(--ok-bg); color: var(--ok-t); } .chip.warn { background: var(--warn-bg); color: var(--warn-t); } .chip.err { background: var(--err-bg); color: var(--err-t); } .chip.info { background: var(--info-bg); color: var(--info-t); }
 .banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; border-radius: 12px; font-size: 14px; }
 .banner.info { background: var(--info-bg); color: var(--info-t); } .banner.warn { background: var(--warn-bg); color: var(--warn-t); } .banner.err { background: var(--err-bg); color: var(--err-t); display: block; }
+.banner.aviso { font-size: 15px; border: 1px solid currentColor; border-left-width: 5px; }
 .banner ul { margin: 0; padding-left: 18px; }
 .confirm { display: inline-flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 13px; margin-top: 10px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
@@ -403,11 +404,11 @@ function shell(r, body) {
   </div>
   <nav class="wrap navin" aria-label="Secciones"><div class="navs">${NAV.map(([k, t]) => `<a href="#${k}" class="${k === r ? 'on' : ''}"${k === r ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</div></nav></header>
   <main class="wrap main">${banners()}${body}</main>
-  <footer class="wrap foot">Prototipo de NóminaHN. ${(S.params[S.sel.anio] && !pendientes(S.params[S.sel.anio]).length) ? 'Los parámetros de ' + S.sel.anio + ' están validados.' : 'Algunos parámetros siguen por validar; revísalos con finanzas antes de usarlos en una planilla real.'} Tus datos se guardan solo en este navegador.</footer>
   <div id="toast" class="toast" role="status" hidden></div>`;
 }
 function banners() {
-  let h = '';
+  const pv = S.params[S.sel.anio], ok = pv && !pendientes(pv).length;
+  let h = `<div class="banner ${ok ? 'info' : 'warn'} aviso" role="note"><div><b>Prototipo de NóminaHN.</b> ${ok ? 'Los parámetros de ' + S.sel.anio + ' están validados.' : 'Algunos parámetros siguen <b>por validar</b>; revísalos con finanzas antes de usarlos en una planilla real.'} Tus datos se guardan solo en este navegador: descarga un respaldo con frecuencia.</div></div>`;
   if (S.demo) h += `<div class="banner info"><div><b>Datos de ejemplo.</b> Los empleados y montos son inventados para que pruebes la app. Puedes editarlos o borrarlos.</div><button class="btn sm" data-act="clear-demo">Borrar datos de ejemplo</button></div>`;
   if (!S.params[S.sel.anio]) {
     const prev = Object.keys(S.params).map(Number).filter(y => y < S.sel.anio).sort().pop() || Object.keys(S.params).map(Number).sort().pop();
