@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NóminaHN</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Concepto: herramienta de oficina contable, sobria, tablas claras y azul bandera como único acento. */
+:root {
+  --bg: #F6F5F1; --surface: #FFFFFF; --surface2: #F1EFE8; --text: #16202A; --muted: #5B6672; --border: #E2E0D9; --border2: #CFCCC2;
+  --accent: #1F5FBF; --accent-h: #174A94; --on-accent: #FFFFFF; --accent-soft: #E6EEFA; --accent-text: #174A94;
+  --ok-bg: #E4F3EA; --ok-t: #14583A; --warn-bg: #FFF1D6; --warn-t: #7A4A00; --err-bg: #FDE8E6; --err-t: #8A1C15; --info-bg: #E6EEFA; --info-t: #174A94;
+  --row-sel: #EEF3FC; --shadow: 0 1px 2px rgba(22,32,42,.06);
+  --font: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0F1419; --surface: #171E26; --surface2: #1F2832; --text: #E8ECF0; --muted: #9AA6B2; --border: #2A343F; --border2: #3A4654;
+  --accent: #3B7BE0; --accent-h: #5B93EA; --on-accent: #FFFFFF; --accent-soft: #1B2B45; --accent-text: #8DB5F2;
+  --ok-bg: #12301F; --ok-t: #7FD3A2; --warn-bg: #3A2B0A; --warn-t: #F0C46B; --err-bg: #3D1714; --err-t: #F2A29B; --info-bg: #1B2B45; --info-t: #8DB5F2;
+  --row-sel: #1B2B45; --shadow: none; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0F1419; --surface: #171E26; --surface2: #1F2832; --text: #E8ECF0; --muted: #9AA6B2; --border: #2A343F; --border2: #3A4654;
+  --accent: #3B7BE0; --accent-h: #5B93EA; --on-accent: #FFFFFF; --accent-soft: #1B2B45; --accent-text: #8DB5F2;
+  --ok-bg: #12301F; --ok-t: #7FD3A2; --warn-bg: #3A2B0A; --warn-t: #F0C46B; --err-bg: #3D1714; --err-t: #F2A29B; --info-bg: #1B2B45; --info-t: #8DB5F2;
+  --row-sel: #1B2B45; --shadow: none; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; }
+a { color: var(--accent-text); } a:hover { color: var(--accent-h); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+.wrap { max-width: 1216px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top { background: var(--surface); border-bottom: 1px solid var(--border); }
+.topin { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding-block: 14px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { width: 40px; height: 40px; border-radius: 10px; background: var(--accent); display: flex; align-items: center; justify-content: center; flex: none; }
+.screen { font-size: 19px; font-weight: 700; }
+.flagchip { display: flex; align-items: center; gap: 10px; border: 1px solid #0073CF; border-radius: 10px; padding: 6px 12px; background: #FFFFFF; font-size: 13px; font-weight: 700; color: #0A4F8F; }
+.flag { flex: none; border-radius: 3px; box-shadow: 0 0 0 1px #CFCCC2; }
+.sp { flex: 1 1 0; min-width: 0; }
+.sel { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+select, input[type=text], input[type=number], input[type=date], input[type=month] { height: 44px; border: 1px solid var(--border2); border-radius: 10px; padding: 0 12px; font-family: inherit; font-size: 14px; color: var(--text); background: var(--surface); min-width: 0; max-width: 100%; }
+input:focus-visible, select:focus-visible, .btn:focus-visible, a:focus-visible, button:focus-visible, label.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.navin { padding-block: 0; }
+.navs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 0; }
+.navs a { padding: 10px 14px; text-decoration: none; color: var(--muted); font-weight: 600; font-size: 14px; border-bottom: 3px solid transparent; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
+.navs a.on { color: var(--accent-text); border-bottom-color: var(--accent); }
+.navs a:hover { color: var(--text); }
+.main { padding-block: 20px 8px; display: flex; flex-direction: column; gap: 16px; }
+.foot { padding-block: 16px 32px; font-size: 12px; color: var(--muted); }
+.h2 { font-size: 19px; font-weight: 700; }
+.card h2, .cardh h2 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
+.tcard { padding: 0; overflow: hidden; } .cardh { padding: 16px 20px 4px; }
+.empty { text-align: center; padding: 32px 20px; }
+.mut { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+.sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; }
+.bar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.plain { margin: 8px 0 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn:hover { background: var(--accent-h); border-color: var(--accent-h); }
+.btn.secondary { background: var(--surface); color: var(--text); border-color: var(--border2); }
+.btn.secondary:hover { background: var(--surface2); }
+.btn.danger { background: #B3261E; border-color: #B3261E; color: #fff; }
+.btn.sm { min-height: 36px; padding: 0 12px; font-size: 13px; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: var(--surface2); color: var(--muted); }
+.chip.ok { background: var(--ok-bg); color: var(--ok-t); } .chip.warn { background: var(--warn-bg); color: var(--warn-t); } .chip.err { background: var(--err-bg); color: var(--err-t); } .chip.info { background: var(--info-bg); color: var(--info-t); }
+.banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; border-radius: 12px; font-size: 14px; }
+.banner.info { background: var(--info-bg); color: var(--info-t); } .banner.warn { background: var(--warn-bg); color: var(--warn-t); } .banner.err { background: var(--err-bg); color: var(--err-t); display: block; }
+.banner ul { margin: 0; padding-left: 18px; }
+.confirm { display: inline-flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 13px; margin-top: 10px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow); min-width: 0; }
+.kl { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.kv { font-family: var(--mono); font-size: 22px; font-weight: 600; margin-top: 6px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ks { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.alerts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.al { padding: 10px 12px; border-radius: 10px; font-size: 14px; } .al.warn { background: var(--warn-bg); color: var(--warn-t); } .al.info { background: var(--info-bg); color: var(--info-t); }
+.mods { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 8px; }
+.mod { display: flex; flex-direction: column; gap: 6px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; text-decoration: none; color: var(--text); font-size: 14px; }
+.mod b { font-size: 16px; } .mod span:last-child { color: var(--muted); font-size: 13px; }
+a.mod:hover { border-color: var(--accent); } .mod.on { border: 2px solid var(--accent); }
+.mod.soon { border-style: dashed; background: transparent; opacity: .85; }
+.tag { align-self: flex-start; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: var(--surface2); color: var(--muted) !important; }
+.tag.ok { background: var(--ok-bg); color: var(--ok-t) !important; }
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; padding: 10px 14px; font-weight: 600; color: var(--muted); background: var(--surface2); white-space: nowrap; font-size: 13px; }
+td { padding: 11px 14px; border-top: 1px solid var(--border); vertical-align: top; }
+th.r, td.num, td.r { text-align: right; }
+td.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.strong, .strong { font-weight: 600; }
+.sm { font-size: 13px; }
+tfoot td { background: var(--surface2); font-weight: 700; border-top: 2px solid var(--text); }
+tr.dim td { color: var(--muted); } tr.warn td { background: var(--warn-bg); } tr.err td { background: var(--err-bg); }
+tr.open td { background: var(--row-sel); } tr.detail td { background: var(--row-sel); border-top: 0; }
+tr.tot td { background: var(--accent-soft); }
+.msg { font-size: 12px; margin-top: 4px; }
+.lnk { background: none; border: 0; padding: 0; font: inherit; color: var(--accent-text); cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.acts { white-space: nowrap; text-align: right; }
+.pt { min-width: 980px; } .nt { min-width: 1100px; }
+.dgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.dgrid h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; }
+dl { margin: 0 0 12px; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 13px; }
+dt { color: var(--muted); } dd { margin: 0; font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.ni { width: 100px; text-align: right; font-family: var(--mono); height: 40px; }
+.f { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
+.f input, .f select { width: 100%; font-weight: 400; }
+.fgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 16px; margin: 12px 0; align-items: end; }
+.wide { grid-column: 1 / -1; }
+@media (min-width: 720px) { .wide { grid-column: span 2; } }
+.ck { display: flex; align-items: center; gap: 10px; font-size: 14px; min-height: 44px; } .ck input { width: 20px; height: 20px; accent-color: var(--accent); }
+.fs { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 12px 0; } .fs legend { font-size: 13px; font-weight: 600; padding: 0 6px; }
+.fs .row { margin-bottom: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--border2); border-radius: 10px; overflow: hidden; }
+.seg button { min-height: 44px; padding: 0 16px; border: 0; background: var(--surface); color: var(--text); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
+.seg button.on { background: var(--accent); color: var(--on-accent); }
+.ctl { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
+.result { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; background: #16202A; color: #fff; border-radius: 14px; padding: 18px 22px; }
+.result .kl { color: #C9D2DC; } .big { font-family: var(--mono); font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; color: var(--accent-text); }
+.plist { display: flex; flex-direction: column; } .pi { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 8px 20px; padding: 12px 0; border-top: 1px solid var(--border); align-items: center; }
+.pi:first-child { border-top: 0; } .pin { display: flex; align-items: center; gap: 8px; font-weight: 400; } .pin i { font-style: normal; color: var(--muted); }
+.pin input { width: 100%; max-width: 220px; font-family: var(--mono); }
+.ok-t { color: var(--ok-t); font-weight: 600; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: #16202A; color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); z-index: 20; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+@media (max-width: 640px) { .pi { grid-template-columns: 1fr; } .screen { font-size: 17px; } .big { font-size: 26px; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(n) ? n : 0; };
+const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function parseISO(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+  if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return (d.getFullYear() === +m[1] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[3]) ? d : null;
+}
+
+const DEFAULT_PARAMS_2026 = {
+  anio: 2026,
+  isr: {
+    tramos: [
+      { hasta: 228324.32, tasa: 0 },
+      { hasta: 348154.10, tasa: 0.15 },
+      { hasta: 809660.72, tasa: 0.20 },
+      { hasta: null, tasa: 0.25 }
+    ],
+    gastosMedicosTope: 40000
+  },
+  ihss: { techoEM: 11903.13, techoIVM: 12498.29, emEmp: 0.025, emPat: 0.05, ivmEmp: 0.025, ivmPat: 0.035 },
+  rap: { piso: 11903.13, techo: 0, tasaEmp: 0.015, tasaPat: 0.015 },
+  infop: { tasa: 0.01 },
+  jornada: { horasDiurna: 8, horasNocturna: 6, horasMixta: 7 },
+  recargos: { extraDiurna: 0.25, extraNocturna: 0.50, extraJornadaNocturna: 0.75 },
+  salarioMinimoPromedio: 14917.20
+};
+
+// Salario vigente de un empleado en un mes (considera aumentos con fecha "desde" AAAA-MM)
+function salarioEn(emp, y, m) {
+  let s = num(emp.salario);
+  const key = y * 100 + m;
+  const cambios = (emp.cambios || []).filter(c => /^\d{4}-\d{2}/.test(c.desde || '')).slice().sort((a, b) => a.desde < b.desde ? -1 : 1);
+  for (const c of cambios) {
+    const mm = /^(\d{4})-(\d{2})/.exec(c.desde);
+    if ((+mm[1]) * 100 + (+mm[2]) <= key) s = num(c.salario);
+  }
+  return s;
+}
+
+// Días pagados (base 30) del empleado en el mes, o null si no estaba activo
+function diasPagadosMes(emp, y, m) {
+  const ini = parseISO(emp.ingreso);
+  if (!ini) return null;
+  const ret = emp.retiro ? parseISO(emp.retiro) : null;
+  const firstDay = new Date(y, m - 1, 1), lastDay = new Date(y, m, 0);
+  if (ini > lastDay) return null;
+  if (ret && ret < firstDay) return null;
+  let desde = 1, hasta = 30;
+  if (ini > firstDay) desde = Math.min(ini.getDate(), 30);
+  if (ret && ret <= lastDay) hasta = Math.min(ret.getDate(), 30);
+  return Math.max(0, hasta - desde + 1);
+}
+
+function horasJornada(emp, p) {
+  if (emp.jornada === 'Nocturna') return p.jornada.horasNocturna;
+  if (emp.jornada === 'Mixta') return p.jornada.horasMixta;
+  return p.jornada.horasDiurna;
+}
+
+function isrAnual(renta, tramos) {
+  let prev = 0, tax = 0;
+  for (const t of tramos) {
+    const top = (t.hasta == null || t.hasta === '') ? Infinity : num(t.hasta);
+    if (renta > prev) tax += (Math.min(renta, top) - prev) * num(t.tasa);
+    prev = top;
+    if (renta <= top) break;
+  }
+  return r2(tax);
+}
+
+// Calcula un mes de un empleado. acc = { ingreso, isr } acumulados del año antes de este mes.
+function calcMes(emp, y, m, nov, p, acc) {
+  const dias = diasPagadosMes(emp, y, m);
+  if (dias === null) return null;
+  nov = nov || {};
+  const sal = salarioEn(emp, y, m);
+  const ausencias = Math.min(dias, Math.max(0, num(nov.diasAusencia)));
+  const diasPag = dias - ausencias;
+  const sueldo = r2(sal / 30 * diasPag);
+  const tarifa = sal / 30 / horasJornada(emp, p);
+  const heD = r2(tarifa * (1 + p.recargos.extraDiurna) * num(nov.heDiurna));
+  const heN = r2(tarifa * (1 + p.recargos.extraNocturna) * num(nov.heNocturna));
+  const heJ = r2(tarifa * (1 + p.recargos.extraJornadaNocturna) * num(nov.heJornadaNocturna));
+  const horasExtra = r2(heD + heN + heJ);
+  const bonos = r2(num(nov.bonos)), comisiones = r2(num(nov.comisiones));
+  const bruto = r2(sueldo + horasExtra + bonos + comisiones);
+
+  const baseEM = Math.min(bruto, p.ihss.techoEM), baseIVM = Math.min(bruto, p.ihss.techoIVM);
+  const ihssEmp = emp.ihss ? r2(baseEM * p.ihss.emEmp + baseIVM * p.ihss.ivmEmp) : 0;
+  const ihssPat = emp.ihss ? r2(baseEM * p.ihss.emPat + baseIVM * p.ihss.ivmPat) : 0;
+  const techoRap = p.rap.techo > 0 ? p.rap.techo : Infinity;
+  const baseRap = emp.rap ? Math.max(0, Math.min(bruto, techoRap) - p.rap.piso) : 0;
+  const rapEmp = r2(baseRap * p.rap.tasaEmp), rapPat = r2(baseRap * p.rap.tasaPat);
+  const infop = r2(bruto * p.infop.tasa);
+
+  // ISR: proyección anual con recálculo cada mes
+  const ret = emp.retiro ? parseISO(emp.retiro) : null;
+  const mesFinal = (ret && ret.getFullYear() === y) ? ret.getMonth() + 1 : 12;
+  const mesesRest = Math.max(1, mesFinal - m + 1);
+  let proyRest = 0;
+  for (let k = m + 1; k <= mesFinal; k++) proyRest += (diasPagadosMes(emp, y, k) || 0) / 30 * salarioEn(emp, y, k);
+  const proyectado = r2(acc.ingreso + bruto + proyRest);
+  const gm = Math.min(Math.max(0, num(emp.gastosMedicos)), p.isr.gastosMedicosTope);
+  const renta = Math.max(0, r2(proyectado - gm));
+  const isrAnualV = isrAnual(renta, p.isr.tramos);
+  const porRetener = r2(isrAnualV - acc.isr);
+  const isr = Math.max(0, r2(porRetener / mesesRest));
+
+  const judicial = r2(num(emp.descuentoJudicial));
+  const otrasFijas = r2(num(emp.otrasFijas));
+  const anticipos = r2(num(nov.anticipos));
+  const otrasMes = r2(num(nov.otrasDeducciones));
+  const deducciones = r2(ihssEmp + rapEmp + isr + judicial + otrasFijas + anticipos + otrasMes);
+  const neto = r2(bruto - deducciones);
+
+  return {
+    salario: sal, dias, ausencias, diasPag, sueldo, heD, heN, heJ, horasExtra, bonos, comisiones, bruto,
+    ihssEmp, rapEmp, isr, judicial, otrasFijas, anticipos, otrasMes, deducciones, neto,
+    ihssPat, rapPat, infop, costoPatrono: r2(ihssPat + rapPat + infop),
+    detalleIsr: { proyectado, ingresoPrevio: r2(acc.ingreso), gastosMedicos: gm, renta, isrAnual: isrAnualV, retenidoPrevio: r2(acc.isr), mesesRest, porRetener, negativo: porRetener < 0 }
+  };
+}
+
+// Calcula la cadena desde el saldo inicial (o enero) hasta el mes m. Devuelve resultado de m, null (no activo) o 'saldo'.
+function calcHasta(emp, y, m, novFn, p) {
+  let acc = { ingreso: 0, isr: 0 }, start = 1;
+  const s = emp.saldo;
+  if (s && num(s.anio) === y && num(s.hasta) > 0) {
+    acc = { ingreso: num(s.ingreso), isr: num(s.isr) };
+    start = Math.min(12, Math.round(num(s.hasta))) + 1;
+    if (m < start) return 'saldo';
+  }
+  let res = null;
+  for (let k = start; k <= m; k++) {
+    const r = calcMes(emp, y, k, novFn(y, k, emp.id), p, acc);
+    if (r) acc = { ingreso: acc.ingreso + r.bruto, isr: acc.isr + r.isr };
+    if (k === m) res = r;
+  }
+  return res;
+}
+
+// Décimo tercer (1 ene a 31 dic) y décimo cuarto (1 jul año anterior a 30 jun): suma de salarios del período / 12
+function calcDecimo(emp, tipo, y, opts) {
+  opts = opts || {};
+  const ini = tipo === 13 ? [y, 1] : [y - 1, 7];
+  const fin = tipo === 13 ? [y, 12] : [y, 6];
+  const filas = [];
+  let yy = ini[0], mm = ini[1];
+  while (yy * 100 + mm <= fin[0] * 100 + fin[1]) {
+    const dias = diasPagadosMes(emp, yy, mm);
+    if (dias !== null) {
+      const sal = salarioEn(emp, yy, mm);
+      filas.push({ y: yy, m: mm, dias, fraccion: dias / 30, salario: sal, aporte: r2(sal * dias / 30) });
+    }
+    mm++; if (mm > 12) { mm = 1; yy++; }
+  }
+  const meses = filas.reduce((a, f) => a + f.fraccion, 0);
+  const suma = r2(filas.reduce((a, f) => a + f.aporte, 0));
+  const base = r2(suma / 12);
+  const variable = opts.incluirVariables ? r2(num(opts.promedioVariable) * meses / 12) : 0;
+  return { tipo, y, periodo: { desde: ini, hasta: fin }, filas, meses: Math.round(meses * 10000) / 10000, suma, base, variable, total: r2(base + variable) };
+}
+</script>
+<script>
+(function () {
+'use strict';
+const KEY = 'nominahn.prototipo.v1';
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => num(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const ymKey = (y, m) => y + '-' + String(m).padStart(2, '0');
+const uid = () => 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const digits = s => String(s || '').replace(/\D/g, '');
+const fmtId = s => { const d = digits(s); return d.length === 13 ? d.slice(0, 4) + '-' + d.slice(4, 8) + '-' + d.slice(8) : (s || ''); };
+const fmtFecha = i => { const d = parseISO(i); return d ? String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear() : ''; };
+const pct = n => (Math.round(num(n) * 10000) / 100) + '%';
+
+const FLAG = (w, h) => `<svg width="${w}" height="${h}" viewBox="0 0 60 30" role="img" aria-label="Bandera de Honduras" class="flag"><rect width="60" height="30" fill="#FFFFFF"/><rect width="60" height="10" fill="#0073CF"/><rect y="20" width="60" height="10" fill="#0073CF"/>${[[30, 15], [22, 12.8], [38, 12.8], [22, 17.2], [38, 17.2]].map(([x, y]) => `<path transform="translate(${x} ${y})" d="M0 -2.6 L0.62 -0.85 L2.47 -0.8 L1 0.32 L1.53 2.1 L0 1.05 L-1.53 2.1 L-1 0.32 L-2.47 -0.8 L-0.62 -0.85 Z" fill="#0073CF"/>`).join('')}</svg>`;
+
+// ---------- Estado y guardado ----------
+function makeEmpty() {
+  const now = new Date();
+  return { v: 1, demo: false, lastBackup: null, sel: { anio: 2026, mes: now.getMonth() + 1 }, company: { name: '', rtn: '', patronal: '', salarioMinimo: DEFAULT_PARAMS_2026.salarioMinimoPromedio }, params: { 2026: clone(DEFAULT_PARAMS_2026) }, employees: [], novedades: {} };
+}
+function makeDemo() {
+  const S0 = makeEmpty();
+  const now = new Date();
+  S0.sel = { anio: 2026, mes: now.getFullYear() === 2026 ? now.getMonth() + 1 : 10 };
+  S0.demo = true;
+  S0.company.name = 'Comercial Ejemplo, S. de R.L.';
+  const base = { jornada: 'Diurna', ihss: true, rap: true, gastosMedicos: 0, descuentoJudicial: 0, otrasFijas: 0, cambios: [], saldo: null, retiro: '' };
+  S0.employees = [
+    Object.assign({}, base, { id: uid() + 'a', nombre: 'Marta Elena Reyes', identidad: '0801198501234', cargo: 'Contadora', ingreso: '2019-04-01', salario: 28500 }),
+    Object.assign({}, base, { id: uid() + 'b', nombre: 'Carlos Andrés Mejía', identidad: '0501199005678', cargo: 'Supervisor de ventas', ingreso: '2021-08-16', salario: 19800 }),
+    Object.assign({}, base, { id: uid() + 'c', nombre: 'Iris Daniela Flores', identidad: '0801199509012', cargo: 'Asistente administrativa', ingreso: '2023-02-01', salario: 15200 }),
+    Object.assign({}, base, { id: uid() + 'd', nombre: 'José Luis Ordóñez', identidad: '1301198803456', cargo: 'Bodeguero', ingreso: '2024-06-03', salario: 11800 }),
+    Object.assign({}, base, { id: uid() + 'e', nombre: 'Ana Patricia Zelaya', identidad: '0801198207890', cargo: 'Gerente', ingreso: '2021-03-15', salario: 48000, gastosMedicos: 40000, cambios: [{ desde: '2026-06', salario: 52000 }] })
+  ];
+  const k = ymKey(2026, 10);
+  S0.novedades[k] = {};
+  S0.novedades[k][S0.employees[1].id] = { heDiurna: 6, comisiones: 1500 };
+  S0.novedades[k][S0.employees[3].id] = { anticipos: 500 };
+  return S0;
+}
+let S = null;
+try { const raw = localStorage.getItem(KEY); if (raw) S = JSON.parse(raw); } catch (e) { S = null; }
+if (!S || !Array.isArray(S.employees)) S = makeDemo();
+let storageWarn = false;
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { storageWarn = true; } }
+
+const ui = { form: null, imp: null, exp: {}, confirm: null, decTipo: 13, decEmp: 'all', decVar: false, decProm: 0, pyear: null, stash: null };
+const ROUTES = { panel: '1. Panel principal', empleados: '2. Empleados', novedades: '3. Novedades del mes', planilla: '4. Planilla mensual', decimos: '5. Décimo tercer y cuarto mes', parametros: '6. Parámetros y empresa' };
+const NAV = [['panel', 'Panel'], ['empleados', 'Empleados'], ['novedades', 'Novedades'], ['planilla', 'Planilla'], ['decimos', 'Décimos'], ['parametros', 'Parámetros']];
+const route = () => { const r = (location.hash || '#panel').slice(1).split('?')[0]; return ROUTES[r] ? r : 'panel'; };
+
+// ---------- Descargas ----------
+let DL = null;
+(async () => { try { if (window.claude && claude.use) DL = await claude.use('downloads'); } catch (e) { DL = null; } })();
+async function saveFile(name, data) {
+  if (!DL) {
+    try {
+      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      toast('Archivo listo: ' + name);
+    } catch (e) { toast('No se pudo guardar el archivo.'); }
+    return;
+  }
+  try { await DL.save({ filename: name, data }); toast('Archivo listo: ' + name); }
+  catch (e) { if (e && e.code === 'declined') return; toast('No se pudo guardar el archivo (' + ((e && e.code) || 'error') + ').'); }
+}
+let toastT = null;
+function toast(msg) { const el = $('#toast'); if (!el) return; el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 3500); }
+
+// ---------- Cálculo del mes seleccionado ----------
+const novFn = (y, m, id) => (S.novedades[ymKey(y, m)] || {})[id];
+function computeMonth() {
+  const y = S.sel.anio, m = S.sel.mes, p = S.params[y] || null;
+  if (!p) return { p: null, rows: [], act: [], tot: null };
+  const rows = S.employees.map(emp => ({ emp, r: calcHasta(emp, y, m, novFn, p) }));
+  const act = rows.filter(x => x.r && x.r !== 'saldo');
+  const sum = k => r2(act.reduce((a, x) => a + x.r[k], 0));
+  return { p, rows, act, tot: { n: act.length, sueldo: sum('sueldo'), horasExtra: sum('horasExtra'), otros: r2(sum('bonos') + sum('comisiones')), bruto: sum('bruto'), ihss: sum('ihssEmp'), rap: sum('rapEmp'), isr: sum('isr'), otras: r2(sum('judicial') + sum('otrasFijas') + sum('anticipos') + sum('otrasMes')), deducciones: sum('deducciones'), neto: sum('neto'), costo: sum('costoPatrono'), ihssPat: sum('ihssPat'), rapPat: sum('rapPat'), infop: sum('infop') } };
+}
+const otrasDed = r => r2(r.judicial + r.otrasFijas + r.anticipos + r.otrasMes);
+
+// ---------- Estructura de la página ----------
+function shell(r, body) {
+  const years = Array.from(new Set([2026, 2027, 2028, S.sel.anio].concat(Object.keys(S.params).map(Number)))).sort();
+  return `<header class="top"><div class="wrap topin">
+    <div class="brand"><span class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span>
+      <h1 class="screen">${esc(ROUTES[r])}</h1></div>
+    <div class="flagchip">${FLAG(48, 24)}<span>NóminaHN</span></div>
+    <div class="sp"></div>
+    <label class="sel">Mes <select id="selMes">${MESES.map((n, i) => `<option value="${i + 1}"${S.sel.mes === i + 1 ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+    <label class="sel">Año <select id="selAnio">${years.map(y => `<option${S.sel.anio === y ? ' selected' : ''}>${y}</option>`).join('')}</select></label>
+  </div>
+  <nav class="wrap navin" aria-label="Secciones"><div class="navs">${NAV.map(([k, t]) => `<a href="#${k}" class="${k === r ? 'on' : ''}"${k === r ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</div></nav></header>
+  <main class="wrap main">${banners()}${body}</main>
+  <footer class="wrap foot">Prototipo de NóminaHN. Los cálculos usan parámetros por validar y deben revisarse con una contadora antes de usarse en una planilla real. Tus datos se guardan solo en este navegador.</footer>
+  <div id="toast" class="toast" role="status" hidden></div>`;
+}
+function banners() {
+  let h = '';
+  if (S.demo) h += `<div class="banner info"><div><b>Datos de ejemplo.</b> Los empleados y montos son inventados para que pruebes la app. Puedes editarlos o borrarlos.</div><button class="btn sm" data-act="clear-demo">Borrar datos de ejemplo</button></div>`;
+  if (!S.params[S.sel.anio]) {
+    const prev = Object.keys(S.params).map(Number).filter(y => y < S.sel.anio).sort().pop() || Object.keys(S.params).map(Number).sort().pop();
+    h += `<div class="banner warn"><div><b>Faltan los parámetros de ${S.sel.anio}.</b> Sin ellos no se puede calcular. Puedes crearlos copiando los de ${prev} y luego ajustarlos.</div><button class="btn sm" data-act="params-copy" data-from="${prev}" data-to="${S.sel.anio}">Copiar parámetros de ${prev}</button></div>`;
+  }
+  if (storageWarn) h += `<div class="banner warn"><div><b>No se pudo guardar en este navegador.</b> Descarga un respaldo para no perder tus datos.</div></div>`;
+  return h;
+}
+function chip(kind, t) { return `<span class="chip ${kind}">${esc(t)}</span>`; }
+
+// ---------- 1. Panel ----------
+function viewPanel() {
+  const M = computeMonth(), t = M.tot;
+  const mesTxt = MESES[S.sel.mes - 1] + ' ' + S.sel.anio;
+  const alerts = [];
+  if (!S.employees.length) alerts.push(['info', 'Aún no hay empleados. Agrégalos a mano o importa la plantilla de Excel.']);
+  M.act.forEach(x => {
+    if (x.r.salario < num(S.company.salarioMinimo)) alerts.push(['warn', `${x.emp.nombre} tiene un salario de L ${fmt(x.r.salario)}, menor al mínimo configurado (L ${fmt(S.company.salarioMinimo)}). Revisa el sector o el salario.`]);
+    if (x.r.detalleIsr.negativo) alerts.push(['warn', `${x.emp.nombre}: ya se retuvo más ISR del que corresponde a la proyección; este mes retiene L 0.00.`]);
+  });
+  M.rows.filter(x => x.r === 'saldo').forEach(x => alerts.push(['info', `${x.emp.nombre}: ${mesTxt} queda cubierto por su saldo inicial.`]));
+  const dias = S.lastBackup ? Math.floor((Date.now() - new Date(S.lastBackup).getTime()) / 86400000) : null;
+  const k = (l, v, s) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${s}</div></div>`;
+  return `
+  <section class="kpis">${t ? [
+    k('Planilla bruta', 'L ' + fmt(t.bruto), mesTxt),
+    k('Neto a pagar', 'L ' + fmt(t.neto), t.bruto ? (Math.round(t.neto / t.bruto * 1000) / 10) + '% del bruto' : ''),
+    k('ISR retenido', 'L ' + fmt(t.isr), 'Proyección anual'),
+    k('Costo del patrono', 'L ' + fmt(t.costo), 'IHSS, RAP e INFOP'),
+    k('Empleados activos', String(t.n), 'en ' + mesTxt)
+  ].join('') : '<div class="card">Crea los parámetros del año para ver los totales.</div>'}</section>
+  ${alerts.length ? `<section class="card"><h2>Para revisar</h2><ul class="alerts">${alerts.map(a => `<li class="al ${a[0]}">${esc(a[1])}</li>`).join('')}</ul></section>` : ''}
+  <section class="grid2">
+    <div class="card"><h2>Respaldo</h2>
+      <p class="mut">${S.lastBackup ? `Último respaldo: hace ${dias} día${dias === 1 ? '' : 's'}.` : 'Aún no has descargado un respaldo.'} Tus datos viven solo en este navegador; si borras los datos del sitio, se pierden.</p>
+      <div class="row"><button class="btn" data-act="backup">Descargar respaldo</button>
+      <label class="btn secondary" for="fileBackup" tabindex="0">Importar respaldo</label><input type="file" id="fileBackup" accept=".json,application/json" hidden></div>
+      ${ui.confirm === 'import' ? `<div class="confirm"><b>Esto reemplaza todos los datos actuales.</b> <button class="btn sm danger" data-act="backup-apply">Sí, reemplazar</button> <button class="btn sm secondary" data-act="confirm-no">Cancelar</button></div>` : ''}
+    </div>
+    <div class="card"><h2>Por validar con la contadora</h2><ul class="plain">
+      <li>Techos y tasas 2026 del IHSS, base y techo del RAP, y la tasa de INFOP.</li>
+      <li>Deducciones del ISR (gastos médicos) y si los décimos se incluyen en la renta anual.</li>
+      <li>Base de los décimos con pagos variables y fechas de pago.</li>
+      <li>Horas extra: jornadas, recargos y feriados.</li></ul>
+      <p class="mut"><a href="#parametros">Ver y editar los parámetros</a></p></div>
+  </section>
+  <section><h2 class="h2">Módulos</h2><div class="mods">
+    <a class="mod on" href="#planilla"><span class="tag">Base</span><b>Planilla mensual</b><span>Sueldo, horas extra, IHSS, RAP, ISR y neto. Boletas en PDF y Excel.</span></a>
+    <a class="mod" href="#empleados"><span class="tag">Datos</span><b>Empleados</b><span>Alta manual o carga masiva desde Excel.</span></a>
+    <a class="mod" href="#novedades"><span class="tag">Datos</span><b>Novedades del mes</b><span>Horas extra, bonos, ausencias y anticipos.</span></a>
+    <a class="mod" href="#decimos"><span class="tag ok">Calculadora</span><b>Décimo tercer y cuarto mes</b><span>Con memoria de cálculo paso a paso.</span></a>
+    <div class="mod soon"><span class="tag">Próximamente</span><b>Vacaciones</b><span>Días ganados, tomados y su valor.</span></div>
+    <div class="mod soon"><span class="tag">Próximamente</span><b>Prestaciones por terminación</b><span>Preaviso, cesantía y vacaciones proporcionales.</span></div>
+    <div class="mod soon"><span class="tag">Próximamente</span><b>Retroactivos de salario mínimo</b><span>Diferencias mes a mes cuando el ajuste llega tarde.</span></div>
+    <div class="mod soon"><span class="tag">Por definir</span><b>Reportes oficiales</b><span>Formatos para SAR, IHSS y RAP.</span></div>
+  </div></section>`;
+}
+
+// ---------- 2. Empleados ----------
+const blankForm = () => ({ id: null, nombre: '', identidad: '', cargo: '', ingreso: '', retiro: '', salario: '', jornada: 'Diurna', ihss: true, rap: true, gastosMedicos: 0, descuentoJudicial: 0, otrasFijas: 0, cambios: [], sHasta: 0, sIng: 0, sIsr: 0, err: [] });
+function formFromEmp(e) { const s = e.saldo || {}; return { id: e.id, nombre: e.nombre, identidad: e.identidad, cargo: e.cargo || '', ingreso: e.ingreso, retiro: e.retiro || '', salario: e.salario, jornada: e.jornada, ihss: !!e.ihss, rap: !!e.rap, gastosMedicos: e.gastosMedicos || 0, descuentoJudicial: e.descuentoJudicial || 0, otrasFijas: e.otrasFijas || 0, cambios: clone(e.cambios || []), sHasta: s.hasta || 0, sIng: s.ingreso || 0, sIsr: s.isr || 0, err: [] }; }
+function readForm() {
+  if (!ui.form) return;
+  const g = id => { const el = $('#' + id); return el ? el.value : ''; }, f = ui.form;
+  if (!$('#f-nombre')) return;
+  f.nombre = g('f-nombre'); f.identidad = g('f-identidad'); f.cargo = g('f-cargo'); f.ingreso = g('f-ingreso'); f.retiro = g('f-retiro'); f.salario = g('f-salario'); f.jornada = g('f-jornada');
+  f.ihss = $('#f-ihss').checked; f.rap = $('#f-rap').checked; f.gastosMedicos = g('f-gm'); f.descuentoJudicial = g('f-jud'); f.otrasFijas = g('f-otras');
+  f.sHasta = g('f-sh'); f.sIng = g('f-si'); f.sIsr = g('f-sisr');
+  f.cambios = f.cambios.map((c, i) => ({ desde: g('cd-' + i), salario: g('cs-' + i) }));
+}
+function formPanel() {
+  const f = ui.form, n = (id, l, v, ex) => `<label class="f"><span>${l}</span><input id="${id}" type="number" step="any" min="0" inputmode="decimal" value="${esc(v)}" ${ex || ''}></label>`;
+  return `<section class="card formcard"><h2>${f.id ? 'Editar empleado' : 'Agregar empleado'}</h2>
+  ${f.err.length ? `<div class="banner err"><ul>${f.err.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+  <div class="fgrid">
+    <label class="f wide"><span>Nombre completo</span><input id="f-nombre" type="text" value="${esc(f.nombre)}" autocomplete="off"></label>
+    <label class="f"><span>Número de identidad (13 dígitos)</span><input id="f-identidad" type="text" inputmode="numeric" value="${esc(f.identidad)}" placeholder="0801-1990-12345"></label>
+    <label class="f"><span>Cargo</span><input id="f-cargo" type="text" value="${esc(f.cargo)}"></label>
+    <label class="f"><span>Fecha de ingreso</span><input id="f-ingreso" type="date" value="${esc(f.ingreso)}"></label>
+    <label class="f"><span>Fecha de retiro (si aplica)</span><input id="f-retiro" type="date" value="${esc(f.retiro)}"></label>
+    ${n('f-salario', 'Salario base mensual (L)', f.salario)}
+    <label class="f"><span>Tipo de jornada</span><select id="f-jornada">${['Diurna', 'Nocturna', 'Mixta'].map(j => `<option${f.jornada === j ? ' selected' : ''}>${j}</option>`).join('')}</select></label>
+    <label class="ck"><input id="f-ihss" type="checkbox"${f.ihss ? ' checked' : ''}> Cotiza al IHSS</label>
+    <label class="ck"><input id="f-rap" type="checkbox"${f.rap ? ' checked' : ''}> Aporta al RAP</label>
+    ${n('f-gm', 'Gastos médicos deducibles del año (L)', f.gastosMedicos)}
+    ${n('f-jud', 'Descuento judicial mensual (L)', f.descuentoJudicial)}
+    ${n('f-otras', 'Otras deducciones fijas mensuales (L)', f.otrasFijas)}
+  </div>
+  <fieldset class="fs"><legend>Aumentos de salario</legend>
+    ${f.cambios.map((c, i) => `<div class="row"><label class="f"><span>Desde el mes</span><input id="cd-${i}" type="month" value="${esc(c.desde)}"></label><label class="f"><span>Nuevo salario (L)</span><input id="cs-${i}" type="number" step="any" min="0" value="${esc(c.salario)}"></label><button class="btn sm secondary" data-act="cam-del" data-i="${i}">Quitar</button></div>`).join('') || '<p class="mut">Sin aumentos registrados.</p>'}
+    <button class="btn sm secondary" data-act="cam-add">Agregar aumento</button></fieldset>
+  <fieldset class="fs"><legend>Saldo inicial de ${S.sel.anio} (si empiezas a usar la app a mitad de año)</legend>
+    <p class="mut">Meses de ${S.sel.anio} ya pagados fuera de la app, con el ingreso acumulado y el ISR retenido hasta ese mes. Deja 0 si empiezas en enero o si el empleado ingresó este año.</p>
+    <div class="fgrid">${n('f-sh', 'Meses cubiertos (0 a 11)', f.sHasta, 'max="11" step="1"')}${n('f-si', 'Ingreso acumulado (L)', f.sIng)}${n('f-sisr', 'ISR retenido acumulado (L)', f.sIsr)}</div></fieldset>
+  <div class="row"><button class="btn" data-act="emp-save">Guardar empleado</button><button class="btn secondary" data-act="emp-cancel">Cancelar</button></div></section>`;
+}
+function impPanel() {
+  const I = ui.imp, ok = I.rows.filter(r => r.status === 'ok').length, wn = I.rows.filter(r => r.status === 'warn').length, er = I.rows.filter(r => r.status === 'err').length;
+  return `<section class="card"><h2>Reporte de importación: ${esc(I.fileName)}</h2>
+  <div class="row">${chip('ok', ok + ' listas')}${wn ? chip('warn', wn + ' con advertencia') : ''}${er ? chip('err', er + ' con error') : ''}${I.nov.length ? chip('info', I.nov.filter(n => n.status !== 'err').length + ' novedades para ' + MESES[S.sel.mes - 1] + ' ' + S.sel.anio) : ''}</div>
+  <div class="tw"><table><thead><tr><th>Fila</th><th>Empleado</th><th>Identidad</th><th class="r">Salario</th><th>Resultado</th></tr></thead><tbody>
+  ${I.rows.map(r => `<tr class="${r.status}"><td class="mono">${r.fila}</td><td>${esc(r.nombre)}</td><td class="mono">${esc(r.identidad)}</td><td class="num">${r.salario ? fmt(r.salario) : ''}</td><td>${chip(r.status === 'ok' ? 'ok' : r.status === 'warn' ? 'warn' : 'err', r.status === 'ok' ? 'Lista' : r.status === 'warn' ? 'Advertencia' : 'Error')}${r.msgs.map(m => `<div class="msg">${esc(m)}</div>`).join('')}</td></tr>`).join('')}
+  ${I.nov.filter(n => n.status === 'err').map(n => `<tr class="err"><td class="mono">Nov. ${n.fila}</td><td colspan="3">${esc(n.identidad)}</td><td>${chip('err', 'Error')}<div class="msg">${esc(n.msg)}</div></td></tr>`).join('')}
+  </tbody></table></div>
+  <p class="mut">Las filas con error no se importan; el resto sí. Si una identidad ya existe, se actualizan sus datos.</p>
+  <div class="row"><button class="btn" data-act="imp-apply"${ok + wn ? '' : ' disabled'}>Importar ${ok + wn} empleado${ok + wn === 1 ? '' : 's'}</button><button class="btn secondary" data-act="imp-cancel">Cancelar</button></div></section>`;
+}
+function viewEmpleados() {
+  const y = S.sel.anio, m = S.sel.mes;
+  const rows = S.employees.map(e => {
+    const act = diasPagadosMes(e, y, m) !== null;
+    return `<tr><td><b>${esc(e.nombre)}</b><div class="sub">${esc(e.cargo || '')}</div></td><td class="mono">${esc(fmtId(e.identidad))}</td><td>${fmtFecha(e.ingreso)}${e.retiro ? `<div class="sub">Retiro ${fmtFecha(e.retiro)}</div>` : ''}</td><td class="num">${fmt(salarioEn(e, y, m))}</td><td>${esc(e.jornada)}</td><td>${e.ihss ? chip('ok', 'IHSS') : chip('', 'Sin IHSS')} ${e.rap ? chip('ok', 'RAP') : chip('', 'Sin RAP')}${act ? '' : ' ' + chip('warn', 'No activo en ' + MESES[m - 1])}</td>
+    <td class="acts">${ui.confirm === 'del:' + e.id ? `<span class="confirm">¿Eliminar? <button class="btn sm danger" data-act="emp-del-yes" data-id="${e.id}">Sí</button> <button class="btn sm secondary" data-act="confirm-no">No</button></span>` : `<button class="btn sm secondary" data-act="emp-edit" data-id="${e.id}">Editar</button> <button class="btn sm secondary" data-act="emp-del" data-id="${e.id}">Eliminar</button>`}</td></tr>`;
+  }).join('');
+  return `<div class="bar"><div><h2 class="h2">${S.employees.length} empleado${S.employees.length === 1 ? '' : 's'}</h2><p class="mut">Los salarios se muestran para ${MESES[m - 1]} ${y}.</p></div>
+    <div class="row"><button class="btn" data-act="emp-new">Agregar empleado</button><button class="btn secondary" data-act="tpl">Descargar plantilla de Excel</button><label class="btn secondary" for="fileEmp" tabindex="0">Importar desde Excel</label><input type="file" id="fileEmp" accept=".xlsx,.xls,.csv" hidden></div></div>
+  ${ui.imp ? impPanel() : ''}${ui.form ? formPanel() : ''}
+  ${S.employees.length ? `<div class="card tcard"><div class="tw"><table><thead><tr><th>Empleado</th><th>Identidad</th><th>Ingreso</th><th class="r">Salario (L)</th><th>Jornada</th><th>Seguridad social</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>` : '<div class="card empty"><b>Todavía no hay empleados.</b><p class="mut">Descarga la plantilla de Excel, llénala e impórtala, o agrega uno a mano.</p></div>'}`;
+}
+
+// ---------- 3. Novedades ----------
+const NOVF = [['heDiurna', 'H. extra diurnas (25%)'], ['heNocturna', 'H. extra nocturnas (50%)'], ['heJornadaNocturna', 'H. extra jornada nocturna (75%)'], ['bonos', 'Bonos (L)'], ['comisiones', 'Comisiones (L)'], ['diasAusencia', 'Días de ausencia sin goce'], ['anticipos', 'Anticipos (L)'], ['otrasDeducciones', 'Otras deducciones (L)']];
+function viewNovedades() {
+  const y = S.sel.anio, m = S.sel.mes, k = ymKey(y, m), list = S.employees.filter(e => diasPagadosMes(e, y, m) !== null);
+  const body = list.map(e => { const nv = (S.novedades[k] || {})[e.id] || {}; return `<tr><td><b>${esc(e.nombre)}</b><div class="sub">${esc(e.cargo || '')}</div></td>${NOVF.map(([f, l]) => `<td><input class="ni" type="number" step="any" min="0" inputmode="decimal" aria-label="${esc(l + ' de ' + e.nombre)}" data-nov="${f}" data-emp="${e.id}" value="${nv[f] ? nv[f] : ''}" placeholder="0"></td>`).join('')}</tr>`; }).join('');
+  return `<div class="bar"><div><h2 class="h2">Novedades de ${MESES[m - 1]} ${y}</h2><p class="mut">Lo que cambia cada mes. Se guarda al salir de cada casilla. <span id="novStatus" class="ok-t"></span></p></div></div>
+  ${list.length ? `<div class="card tcard"><div class="tw"><table class="nt"><thead><tr><th>Empleado</th>${NOVF.map(([, l]) => `<th class="r">${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div></div>` : '<div class="card empty"><b>No hay empleados activos en este mes.</b></div>'}
+  <p class="mut">Las horas extra se pagan con la tarifa por hora de cada jornada y el recargo de la pantalla de parámetros.</p>`;
+}
+
+// ---------- 4. Planilla ----------
+function viewPlanilla() {
+  const M = computeMonth(), y = S.sel.anio, m = S.sel.mes;
+  if (!M.p) return '<div class="card empty"><b>Faltan los parámetros de este año.</b></div>';
+  const t = M.tot;
+  const body = M.rows.map(({ emp, r }) => {
+    if (!r) return '';
+    if (r === 'saldo') return `<tr class="dim"><td><b>${esc(emp.nombre)}</b></td><td colspan="9">Cubierto por el saldo inicial; no se calcula en la app.</td></tr>`;
+    const open = ui.exp[emp.id];
+    const warn = [];
+    if (r.salario < num(S.company.salarioMinimo)) warn.push('Salario menor al mínimo configurado');
+    if (r.detalleIsr.negativo) warn.push('ISR: ya se retuvo de más');
+    const d = r.detalleIsr;
+    return `<tr class="${open ? 'open' : ''}"><td><button class="lnk" data-act="exp" data-id="${emp.id}" aria-expanded="${open ? 'true' : 'false'}"><b>${esc(emp.nombre)}</b></button><div class="sub">${esc(emp.cargo || '')}</div>${warn.map(w => `<div>${chip('warn', w)}</div>`).join('')}</td>
+      <td class="num">${fmt(r.sueldo)}</td><td class="num">${fmt(r.horasExtra)}</td><td class="num">${fmt(r.bonos + r.comisiones)}</td><td class="num strong">${fmt(r.bruto)}</td><td class="num">${fmt(r.ihssEmp)}</td><td class="num">${fmt(r.rapEmp)}</td><td class="num">${fmt(r.isr)}</td><td class="num">${fmt(otrasDed(r))}</td><td class="num strong">${fmt(r.neto)}</td></tr>
+    ${open ? `<tr class="detail"><td colspan="10"><div class="dgrid">
+      <div><h3>Ingresos</h3><dl><dt>Salario mensual vigente</dt><dd>L ${fmt(r.salario)}</dd><dt>Días pagados (base 30)</dt><dd>${r.diasPag}${r.ausencias ? ` (${r.ausencias} de ausencia)` : ''}</dd><dt>Sueldo del mes</dt><dd>L ${fmt(r.sueldo)}</dd><dt>Horas extra</dt><dd>L ${fmt(r.horasExtra)}</dd><dt>Bonos y comisiones</dt><dd>L ${fmt(r.bonos + r.comisiones)}</dd></dl></div>
+      <div><h3>ISR: proyección anual</h3><dl><dt>Ingreso anual proyectado</dt><dd>L ${fmt(d.proyectado)}</dd><dt>Gastos médicos deducidos</dt><dd>L ${fmt(d.gastosMedicos)}</dd><dt>Renta neta gravable</dt><dd>L ${fmt(d.renta)}</dd><dt>ISR anual (tabla ${y})</dt><dd>L ${fmt(d.isrAnual)}</dd><dt>Ya retenido antes de este mes</dt><dd>L ${fmt(d.retenidoPrevio)}</dd><dt>Por retener ÷ ${d.mesesRest} mes${d.mesesRest === 1 ? '' : 'es'}</dt><dd>L ${fmt(d.porRetener)} → <b>L ${fmt(r.isr)}</b></dd></dl></div>
+      <div><h3>Costo del patrono (aparte)</h3><dl><dt>IHSS patronal</dt><dd>L ${fmt(r.ihssPat)}</dd><dt>RAP patronal</dt><dd>L ${fmt(r.rapPat)}</dd><dt>INFOP</dt><dd>L ${fmt(r.infop)}</dd><dt>Total</dt><dd><b>L ${fmt(r.costoPatrono)}</b></dd></dl><h3>Otras deducciones</h3><dl><dt>Descuento judicial</dt><dd>L ${fmt(r.judicial)}</dd><dt>Otras fijas</dt><dd>L ${fmt(r.otrasFijas)}</dd><dt>Anticipos y otras del mes</dt><dd>L ${fmt(r.anticipos + r.otrasMes)}</dd></dl></div>
+    </div></td></tr>` : ''}`;
+  }).join('');
+  return `<div class="bar"><div><h2 class="h2">Planilla de ${MESES[m - 1]} ${y}</h2><p class="mut">Toca el nombre de un empleado para ver el desglose y el cálculo del ISR.</p></div>
+    <div class="row"><button class="btn secondary" data-act="xlsx-planilla"${t && t.n ? '' : ' disabled'}>Exportar a Excel</button><button class="btn" data-act="pdf-boletas"${t && t.n ? '' : ' disabled'}>Generar boletas (PDF)</button></div></div>
+  <section class="kpis sm"><div class="kpi"><div class="kl">Bruto</div><div class="kv">L ${fmt(t.bruto)}</div></div><div class="kpi"><div class="kl">Deducciones</div><div class="kv">L ${fmt(t.deducciones)}</div></div><div class="kpi"><div class="kl">Neto a pagar</div><div class="kv">L ${fmt(t.neto)}</div></div><div class="kpi"><div class="kl">Costo del patrono</div><div class="kv">L ${fmt(t.costo)}</div></div></section>
+  ${S.employees.length ? `<div class="card tcard"><div class="tw"><table class="pt"><thead><tr><th>Empleado</th><th class="r">Sueldo</th><th class="r">H. extra</th><th class="r">Otros ingresos</th><th class="r">Bruto</th><th class="r">IHSS</th><th class="r">RAP</th><th class="r">ISR</th><th class="r">Otras ded.</th><th class="r">Neto</th></tr></thead><tbody>${body}</tbody>
+  <tfoot><tr><td>Totales (${t.n})</td><td class="num">${fmt(t.sueldo)}</td><td class="num">${fmt(t.horasExtra)}</td><td class="num">${fmt(t.otros)}</td><td class="num">${fmt(t.bruto)}</td><td class="num">${fmt(t.ihss)}</td><td class="num">${fmt(t.rap)}</td><td class="num">${fmt(t.isr)}</td><td class="num">${fmt(t.otras)}</td><td class="num">${fmt(t.neto)}</td></tr></tfoot></table></div></div>` : '<div class="card empty"><b>No hay empleados.</b></div>'}
+  <p class="mut">Cada mes se recalcula con las novedades guardadas. Valores en lempiras.</p>`;
+}
+
+// ---------- 5. Décimos ----------
+function viewDecimos() {
+  const y = S.sel.anio, tipo = ui.decTipo, opts = { incluirVariables: ui.decVar, promedioVariable: ui.decProm };
+  const nombreT = tipo === 13 ? 'Décimo tercer mes' : 'Décimo cuarto mes';
+  const periodo = tipo === 13 ? `1 de enero al 31 de diciembre de ${y}` : `1 de julio de ${y - 1} al 30 de junio de ${y}`;
+  const pago = tipo === 13 ? 'Se paga en diciembre.' : 'Se paga en junio (fecha límite: 30 de junio).';
+  const sel = ui.decEmp;
+  const emps = S.employees;
+  let out = '';
+  if (sel === 'all') {
+    const rows = emps.map(e => ({ e, c: calcDecimo(e, tipo, y, opts) })).filter(x => x.c.filas.length);
+    const tot = r2(rows.reduce((a, x) => a + x.c.total, 0));
+    out = `<div class="card tcard"><div class="tw"><table><thead><tr><th>Empleado</th><th class="r">Meses computables</th><th class="r">Suma de salarios</th><th class="r">Pagos variables</th><th class="r">Importe</th></tr></thead><tbody>${rows.map(({ e, c }) => `<tr><td><b>${esc(e.nombre)}</b><div class="sub">${esc(e.cargo || '')}</div></td><td class="num">${c.meses.toFixed(2)}</td><td class="num">${fmt(c.suma)}</td><td class="num">${fmt(c.variable)}</td><td class="num strong">${fmt(c.total)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total (${rows.length})</td><td></td><td></td><td></td><td class="num">${fmt(tot)}</td></tr></tfoot></table></div></div>`;
+  } else {
+    const e = emps.find(x => x.id === sel);
+    if (!e) out = '<div class="card empty">Elige un empleado.</div>';
+    else {
+      const c = calcDecimo(e, tipo, y, opts);
+      const pd = c.periodo, ini = MESES[pd.desde[1] - 1] + ' ' + pd.desde[0], fin = MESES[pd.hasta[1] - 1] + ' ' + pd.hasta[0];
+      out = `<div class="result"><div><div class="kl">${nombreT} ${y}</div><div>${esc(e.nombre)}</div></div><div class="big">L ${fmt(c.total)}</div></div>
+      <div class="card tcard"><div class="cardh"><h2>Memoria de cálculo, paso a paso</h2><p class="mut">Cada paso muestra su fórmula. La base legal queda por confirmar con la contadora.</p></div><div class="tw"><table><thead><tr><th>#</th><th>Concepto</th><th>Desarrollo</th><th>Base legal</th><th class="r">Importe</th></tr></thead><tbody>
+      <tr><td class="mono">1</td><td><b>Período computable</b><div class="sub">${esc(periodo)}</div></td><td class="mono sm">${ini} a ${fin}: ${c.meses.toFixed(4)} meses trabajados (base 30 días)</td><td>${chip('warn', 'Por confirmar')}</td><td class="num">${c.meses.toFixed(2)}</td></tr>
+      <tr><td class="mono">2</td><td><b>Salarios del período</b><div class="sub">Salario de cada mes × días trabajados ÷ 30</div></td><td class="sm"><details><summary>Ver los ${c.filas.length} meses</summary><div class="mono sm">${c.filas.map(f => `${MESES[f.m - 1].slice(0, 3)} ${f.y}: ${fmt(f.salario)} × ${f.dias}/30 = ${fmt(f.aporte)}`).join('<br>')}</div></details></td><td>${chip('warn', 'Por confirmar')}</td><td class="num">${fmt(c.suma)}</td></tr>
+      <tr><td class="mono">3</td><td><b>Entre 12 meses</b></td><td class="mono sm">${fmt(c.suma)} ÷ 12</td><td>${chip('warn', 'Por confirmar')}</td><td class="num">${fmt(c.base)}</td></tr>
+      <tr><td class="mono">4</td><td><b>Promedio de pagos variables</b><div class="sub">Horas extra y comisiones (opcional)</div></td><td class="mono sm">${ui.decVar ? `${fmt(ui.decProm)} × ${c.meses.toFixed(4)} ÷ 12` : 'No se incluyen'}</td><td>${chip('warn', 'Por confirmar')}</td><td class="num">${fmt(c.variable)}</td></tr>
+      <tr class="tot"><td class="mono">5</td><td><b>Importe del ${nombreT.toLowerCase()}</b></td><td class="mono sm">${fmt(c.base)} + ${fmt(c.variable)}</td><td></td><td class="num strong">${fmt(c.total)}</td></tr></tbody></table></div></div>`;
+    }
+  }
+  return `<div class="bar"><div><h2 class="h2">${nombreT} ${y}</h2><p class="mut">${pago} Período: ${periodo}.</p></div>
+    <div class="row">${sel === 'all' ? `<button class="btn secondary" data-act="xlsx-decimos">Exportar a Excel</button>` : ''}</div></div>
+  <div class="card ctl"><div class="seg" role="tablist"><button class="${tipo === 13 ? 'on' : ''}" data-act="dec-tipo" data-t="13">Décimo tercer mes</button><button class="${tipo === 14 ? 'on' : ''}" data-act="dec-tipo" data-t="14">Décimo cuarto mes</button></div>
+    <label class="f"><span>Empleado</span><select id="decEmp"><option value="all"${sel === 'all' ? ' selected' : ''}>Toda la planilla</option>${emps.map(e => `<option value="${e.id}"${sel === e.id ? ' selected' : ''}>${esc(e.nombre)}</option>`).join('')}</select></label>
+    <label class="ck"><input id="decVar" type="checkbox"${ui.decVar ? ' checked' : ''}> Incluir pagos variables</label>
+    ${ui.decVar ? `<label class="f"><span>Promedio mensual de horas extra y comisiones (L)</span><input id="decProm" type="number" step="any" min="0" value="${esc(ui.decProm || '')}"></label>` : ''}</div>
+  ${out}`;
+}
+
+// ---------- 6. Parámetros y empresa ----------
+const PSPEC = [
+  ['ISR (personas naturales)', [
+    ['isr.gastosMedicosTope', 'Tope anual de gastos médicos deducibles', 'L', 'v', 'Valor de referencia; confirmar con la contadora.']]],
+  ['IHSS', [
+    ['ihss.techoEM', 'Techo salarial, enfermedad y maternidad', 'L', 'v', 'El techo de 2025 era L 11,903.13; confirmar el de 2026.'],
+    ['ihss.techoIVM', 'Techo salarial, invalidez, vejez y muerte', 'L', 'v', 'Cifra reportada por un sitio de terceros para 2026; confirmar.'],
+    ['ihss.emEmp', 'Enfermedad y maternidad: empleado', '%', 'r', 'Reportado por El Heraldo.'], ['ihss.emPat', 'Enfermedad y maternidad: patrono', '%', 'r', 'Reportado por El Heraldo.'],
+    ['ihss.ivmEmp', 'Invalidez, vejez y muerte: empleado', '%', 'r', 'Reportado por El Heraldo.'], ['ihss.ivmPat', 'Invalidez, vejez y muerte: patrono', '%', 'r', 'Reportado por El Heraldo.']]],
+  ['RAP', [
+    ['rap.piso', 'Monto desde el cual se cotiza (piso)', 'L', 'v', 'El comunicado del RAP lo llama a veces techo y a veces piso; confirmar la base.'],
+    ['rap.techo', 'Techo de cotización (0 = sin techo)', 'L', 'v', 'Por definir con la contadora.'],
+    ['rap.tasaEmp', 'Aporte del empleado', '%', 'r', 'Comunicado del RAP.'], ['rap.tasaPat', 'Aporte del patrono', '%', 'r', 'Comunicado del RAP.']]],
+  ['INFOP', [['infop.tasa', 'Aporte del patrono sobre el bruto', '%', 'v', 'Tasa de referencia; confirmar si aplica por tamaño de empresa.']]],
+  ['Jornada y horas extra', [
+    ['jornada.horasDiurna', 'Horas de la jornada diurna', 'h', 'v', 'El Código de Trabajo fija 8 diarias y 44 semanales.'],
+    ['jornada.horasNocturna', 'Horas de la jornada nocturna', 'h', 'v', 'Por confirmar.'], ['jornada.horasMixta', 'Horas de la jornada mixta', 'h', 'v', 'Por confirmar.'],
+    ['recargos.extraDiurna', 'Recargo de hora extra diurna', '%', 'r', 'Reportado por El Heraldo (artículo 320).'],
+    ['recargos.extraNocturna', 'Recargo de hora extra nocturna', '%', 'r', 'Reportado por El Heraldo (artículo 320).'],
+    ['recargos.extraJornadaNocturna', 'Recargo de extra en jornada nocturna', '%', 'r', 'Reportado por El Heraldo (artículo 320).']]]
+];
+const getP = (o, path) => path.split('.').reduce((a, k) => a[k], o);
+const setP = (o, path, v) => { const ks = path.split('.'); const l = ks.pop(); ks.reduce((a, k) => a[k], o)[l] = v; };
+function viewParametros() {
+  const years = Object.keys(S.params).map(Number).sort();
+  if (!ui.pyear || !S.params[ui.pyear]) ui.pyear = S.params[S.sel.anio] ? S.sel.anio : years[years.length - 1];
+  const p = S.params[ui.pyear], next = Math.max.apply(null, years) + 1;
+  const stChip = s => s === 'r' ? chip('ok', 'Reportado') : chip('warn', 'Por validar');
+  return `<section class="card"><h2>Empresa</h2><div class="fgrid">
+    <label class="f wide"><span>Nombre de la empresa</span><input type="text" data-co="name" value="${esc(S.company.name)}"></label>
+    <label class="f"><span>RTN</span><input type="text" data-co="rtn" value="${esc(S.company.rtn)}"></label>
+    <label class="f"><span>Número patronal del IHSS</span><input type="text" data-co="patronal" value="${esc(S.company.patronal)}"></label>
+    <label class="f"><span>Salario mínimo aplicable (L al mes)</span><input type="number" step="any" min="0" data-co="salarioMinimo" value="${esc(S.company.salarioMinimo)}"></label></div>
+    <p class="mut">El salario mínimo depende de la actividad y el tamaño de la empresa. Por defecto se usa el promedio publicado por el SAR (L 14,917.20); ajústalo al de tu actividad. Se usa para avisar cuando un salario queda por debajo.</p></section>
+  <div class="bar"><div><h2 class="h2">Parámetros por año</h2><p class="mut">Cada año tiene su propia tabla. Al llegar un año nuevo, se copia y se ajusta; los cálculos anteriores no cambian.</p></div>
+    <div class="row"><label class="sel">Año <select id="pyear">${years.map(y => `<option${y === ui.pyear ? ' selected' : ''}>${y}</option>`).join('')}</select></label><button class="btn secondary" data-act="params-copy" data-from="${years[years.length - 1]}" data-to="${next}">Crear ${next} copiando ${years[years.length - 1]}</button></div></div>
+  <section class="card"><h2>ISR: tabla progresiva anual ${ui.pyear}</h2><p class="mut">Renta neta gravable anual. La exención y el tramo de 15% fueron reportados por el SAR; el tope del 20% se calculó a partir de la tabla mensual y debe validarse.</p>
+    <div class="tw"><table><thead><tr><th>Tramo</th><th class="r">Hasta (L al año)</th><th class="r">Tasa</th><th>Estado</th></tr></thead><tbody>${p.isr.tramos.map((t, i) => `<tr><td>${i === 0 ? 'Exento' : 'Tramo ' + (i + 1)}</td><td>${t.hasta == null ? '<span class="mut">En adelante</span>' : `<input class="ni" type="number" step="any" min="0" data-tr="${i}" data-k="hasta" aria-label="Hasta del tramo ${i + 1}" value="${t.hasta}">`}</td><td><input class="ni" type="number" step="any" min="0" max="100" data-tr="${i}" data-k="tasa" aria-label="Tasa del tramo ${i + 1}" value="${Math.round(num(t.tasa) * 10000) / 100}"> %</td><td>${stChip(i < 2 ? 'r' : 'v')}</td></tr>`).join('')}</tbody></table></div></section>
+  ${PSPEC.map(([g, items]) => `<section class="card"><h2>${g}</h2><div class="plist">${items.map(([path, l, u, st, src]) => { const raw = getP(p, path); const v = u === '%' ? Math.round(num(raw) * 10000) / 100 : raw; return `<div class="pi"><label class="f"><span>${l}</span><span class="pin"><input type="number" step="any" min="0" data-p="${path}" data-u="${u}" value="${esc(v)}"> <i>${u}</i></span></label><div>${stChip(st)}<div class="sub">${esc(src)}</div></div></div>`; }).join('')}</div></section>`).join('')}
+  <section class="card"><h2>Salario mínimo promedio</h2><div class="pi"><label class="f"><span>Promedio vigente para efectos tributarios (L)</span><span class="pin"><input type="number" step="any" min="0" data-p="salarioMinimoPromedio" data-u="L" value="${esc(p.salarioMinimoPromedio)}"> <i>L</i></span></label><div>${chip('ok', 'Reportado')}<div class="sub">Comunicado SAR-19-2026 (Acuerdo SETRASS-233-2026).</div></div></div></section>
+  <div class="row"><button class="btn secondary" data-act="params-reset" data-y="${ui.pyear}">Restablecer valores de referencia de ${ui.pyear}</button></div>`;
+}
+
+// ---------- Excel y PDF ----------
+const EMP_H = ['Nombre completo', 'Identidad', 'Cargo', 'Fecha de ingreso (AAAA-MM-DD)', 'Salario base mensual', 'Jornada', 'Cotiza IHSS', 'Aporta RAP', 'Gastos médicos anuales', 'Descuento judicial mensual', 'Otras deducciones fijas', 'Aumento desde (AAAA-MM)', 'Salario nuevo', 'Saldo: meses cubiertos', 'Saldo: ingreso acumulado', 'Saldo: ISR retenido'];
+const NOV_H = ['Identidad', 'Horas extra diurnas', 'Horas extra nocturnas', 'Horas extra jornada nocturna', 'Bonos', 'Comisiones', 'Días de ausencia sin goce', 'Anticipos', 'Otras deducciones'];
+function plantillaXlsx() {
+  const wb = XLSX.utils.book_new();
+  const w1 = XLSX.utils.aoa_to_sheet([EMP_H]); w1['!cols'] = EMP_H.map(h => ({ wch: Math.max(14, h.length + 2) }));
+  const w2 = XLSX.utils.aoa_to_sheet([NOV_H]); w2['!cols'] = NOV_H.map(h => ({ wch: Math.max(14, h.length + 2) }));
+  const ins = [['Cómo llenar la plantilla de NóminaHN'], [''], ['Hoja Empleados: una fila por empleado. Borra las filas que no uses.'], ['Hoja Novedades: horas extra, bonos y ausencias del mes seleccionado en la app. Se busca al empleado por su identidad.'], [''],
+    ['Columna', 'Qué escribir', 'Ejemplo'],
+    ['Nombre completo', 'Nombre y apellidos', 'María López Pérez'], ['Identidad', '13 dígitos, con o sin guiones', '0801-1990-12345'], ['Fecha de ingreso', 'Año-mes-día', '2024-03-15'], ['Salario base mensual', 'En lempiras, sin símbolo', '15200'],
+    ['Jornada', 'Diurna, Nocturna o Mixta', 'Diurna'], ['Cotiza IHSS / Aporta RAP', 'Sí o No (vacío = Sí)', 'Sí'], ['Gastos médicos anuales', 'Total deducible del año', '0'],
+    ['Aumento desde / Salario nuevo', 'Mes del aumento (AAAA-MM) y el nuevo salario', '2026-06 / 17000'], ['Saldo', 'Solo si empiezas a mitad de año: meses ya pagados (0 a 11), ingreso acumulado e ISR retenido', '9 / 136800 / 4100']];
+  const w3 = XLSX.utils.aoa_to_sheet(ins); w3['!cols'] = [{ wch: 34 }, { wch: 70 }, { wch: 22 }];
+  XLSX.utils.book_append_sheet(wb, w1, 'Empleados'); XLSX.utils.book_append_sheet(wb, w2, 'Novedades'); XLSX.utils.book_append_sheet(wb, w3, 'Instrucciones');
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+}
+const nk = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+function pick(row, aliases) { const map = {}; Object.keys(row).forEach(k => { map[nk(k)] = row[k]; }); for (const a of aliases) { if (map[a] !== undefined && map[a] !== '') return map[a]; } return ''; }
+function fechaAny(v) {
+  if (v === '' || v == null) return '';
+  if (typeof v === 'number') { const d = XLSX.SSF.parse_date_code(v); return d ? `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}` : ''; }
+  const s = String(v).trim(); let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
+}
+const siNo = (v, def) => { if (v === '' || v == null) return def; return /^(si|s|1|true|x|yes)$/.test(nk(v)); };
+async function importFile(file) {
+  if (typeof XLSX === 'undefined') { toast('La librería de Excel no cargó. Revisa tu conexión.'); return; }
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const sh = wb.Sheets['Empleados'] || wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sh, { defval: '', raw: true });
+    const seen = {}, out = [], minimo = num(S.company.salarioMinimo);
+    rows.forEach((row, i) => {
+      const fila = i + 2, msgs = []; let status = 'ok';
+      const nombre = String(pick(row, ['nombre completo', 'nombre']) || '').trim(), idn = digits(pick(row, ['identidad', 'dni', 'numero de identidad']));
+      const ingreso = fechaAny(pick(row, ['fecha de ingreso aaaa mm dd', 'fecha de ingreso', 'ingreso'])), salario = num(pick(row, ['salario base mensual', 'salario base', 'salario']));
+      if (!nombre && !idn && !salario) return;
+      if (!nombre) { status = 'err'; msgs.push(`Fila ${fila}: falta el nombre.`); }
+      if (idn.length !== 13) { status = 'err'; msgs.push(`Fila ${fila}: la identidad tiene ${idn.length} dígitos; debe tener 13.`); }
+      else if (seen[idn]) { status = 'err'; msgs.push(`Fila ${fila}: la identidad está repetida en el archivo.`); } else seen[idn] = true;
+      if (!parseISO(ingreso)) { status = 'err'; msgs.push(`Fila ${fila}: la fecha de ingreso no es válida (usa AAAA-MM-DD).`); }
+      if (!(salario > 0)) { status = 'err'; msgs.push(`Fila ${fila}: el salario debe ser mayor que 0.`); }
+      let jornada = String(pick(row, ['jornada', 'tipo de jornada']) || 'Diurna').trim();
+      jornada = ['Diurna', 'Nocturna', 'Mixta'].find(j => nk(j) === nk(jornada)) || null;
+      if (!jornada) { jornada = 'Diurna'; if (status === 'ok') status = 'warn'; msgs.push(`Fila ${fila}: jornada no reconocida; se usó Diurna.`); }
+      if (status !== 'err' && salario < minimo) { status = 'warn'; msgs.push(`Fila ${fila}: salario menor al mínimo configurado (L ${fmt(minimo)}).`); }
+      const cd = String(pick(row, ['aumento desde aaaa mm', 'aumento desde']) || '').trim(), cs = num(pick(row, ['salario nuevo']));
+      const sh2 = Math.max(0, Math.min(11, Math.round(num(pick(row, ['saldo meses cubiertos'])))));
+      const emp = { nombre, identidad: idn, cargo: String(pick(row, ['cargo']) || '').trim(), ingreso, retiro: '', salario, jornada, ihss: siNo(pick(row, ['cotiza ihss', 'ihss']), true), rap: siNo(pick(row, ['aporta rap', 'rap']), true), gastosMedicos: num(pick(row, ['gastos medicos anuales', 'gastos medicos'])), descuentoJudicial: num(pick(row, ['descuento judicial mensual', 'descuento judicial'])), otrasFijas: num(pick(row, ['otras deducciones fijas', 'otras deducciones fijas mensuales'])), cambios: (/^\d{4}-\d{2}$/.test(cd) && cs > 0) ? [{ desde: cd, salario: cs }] : [], saldo: sh2 > 0 ? { anio: S.sel.anio, hasta: sh2, ingreso: num(pick(row, ['saldo ingreso acumulado'])), isr: num(pick(row, ['saldo isr retenido'])) } : null };
+      out.push({ fila, status, msgs, nombre: nombre || '(sin nombre)', identidad: fmtId(idn) || String(pick(row, ['identidad']) || ''), salario, emp });
+    });
+    const nov = [];
+    const ns = wb.Sheets['Novedades'];
+    if (ns) XLSX.utils.sheet_to_json(ns, { defval: '', raw: true }).forEach((row, i) => {
+      const idn = digits(pick(row, ['identidad'])); if (!idn) return;
+      const ok = out.some(r => r.status !== 'err' && r.emp.identidad === idn) || S.employees.some(e => e.identidad === idn);
+      const v = { heDiurna: num(pick(row, ['horas extra diurnas'])), heNocturna: num(pick(row, ['horas extra nocturnas'])), heJornadaNocturna: num(pick(row, ['horas extra jornada nocturna'])), bonos: num(pick(row, ['bonos'])), comisiones: num(pick(row, ['comisiones'])), diasAusencia: num(pick(row, ['dias de ausencia sin goce'])), anticipos: num(pick(row, ['anticipos'])), otrasDeducciones: num(pick(row, ['otras deducciones'])) };
+      nov.push({ fila: i + 2, identidad: fmtId(idn), idn, status: ok ? 'ok' : 'err', msg: ok ? '' : 'Esa identidad no está entre tus empleados ni en el archivo.', v });
+    });
+    ui.imp = { fileName: file.name, rows: out, nov };
+    if (!out.length) { ui.imp = null; toast('No encontré filas de empleados en la hoja "Empleados".'); }
+    ui.form = null; render();
+  } catch (e) { toast('No pude leer el archivo. Usa la plantilla de .xlsx.'); }
+}
+function aplicarImport() {
+  const I = ui.imp; if (!I) return; let nuevos = 0, act = 0;
+  I.rows.filter(r => r.status !== 'err').forEach(r => {
+    const ex = S.employees.find(e => e.identidad === r.emp.identidad);
+    if (ex) { Object.assign(ex, r.emp, { id: ex.id, retiro: ex.retiro || '' }); act++; } else { S.employees.push(Object.assign({ id: uid() }, r.emp)); nuevos++; }
+  });
+  const k = ymKey(S.sel.anio, S.sel.mes);
+  I.nov.filter(n => n.status === 'ok').forEach(n => { const e = S.employees.find(x => x.identidad === n.idn); if (!e) return; S.novedades[k] = S.novedades[k] || {}; const v = {}; Object.keys(n.v).forEach(f => { if (n.v[f]) v[f] = n.v[f]; }); S.novedades[k][e.id] = v; });
+  save(); ui.imp = null; render(); toast(`Importado: ${nuevos} nuevos y ${act} actualizados.`);
+}
+function colsAuto(aoa) { const w = []; aoa.forEach(r => r.forEach((c, i) => { w[i] = Math.max(w[i] || 10, Math.min(40, String(c == null ? '' : c).length + 2)); })); return w.map(x => ({ wch: x })); }
+function planillaXlsx() {
+  const M = computeMonth(), y = S.sel.anio, m = S.sel.mes, p = M.p;
+  const head = ['Identidad', 'Empleado', 'Cargo', 'Días pagados', 'Sueldo', 'Horas extra', 'Bonos y comisiones', 'Bruto', 'IHSS', 'RAP', 'ISR', 'Desc. judicial', 'Otras deducciones', 'Total deducciones', 'Neto a pagar', 'IHSS patronal', 'RAP patronal', 'INFOP', 'Costo patrono'];
+  const rows = M.act.map(({ emp, r }) => [fmtId(emp.identidad), emp.nombre, emp.cargo, r.diasPag, r.sueldo, r.horasExtra, r2(r.bonos + r.comisiones), r.bruto, r.ihssEmp, r.rapEmp, r.isr, r.judicial, r2(r.otrasFijas + r.anticipos + r.otrasMes), r.deducciones, r.neto, r.ihssPat, r.rapPat, r.infop, r.costoPatrono]);
+  const t = M.tot, tot = ['', 'TOTALES', '', '', t.sueldo, t.horasExtra, t.otros, t.bruto, t.ihss, t.rap, t.isr, r2(M.act.reduce((a, x) => a + x.r.judicial, 0)), r2(t.otras - M.act.reduce((a, x) => a + x.r.judicial, 0)), t.deducciones, t.neto, t.ihssPat, t.rapPat, t.infop, t.costo];
+  const a1 = [[S.company.name || 'Empresa', '', '', 'Planilla de ' + MESES[m - 1] + ' ' + y], [], head].concat(rows, [tot]);
+  const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = colsAuto(a1.slice(2));
+  const h2 = ['Empleado', 'Ingreso anual proyectado', 'Gastos médicos', 'Renta neta gravable', 'ISR anual', 'Retenido antes del mes', 'Meses restantes', 'Retención del mes'];
+  const a2 = [h2].concat(M.act.map(({ emp, r }) => [emp.nombre, r.detalleIsr.proyectado, r.detalleIsr.gastosMedicos, r.detalleIsr.renta, r.detalleIsr.isrAnual, r.detalleIsr.retenidoPrevio, r.detalleIsr.mesesRest, r.isr]));
+  const w2 = XLSX.utils.aoa_to_sheet(a2); w2['!cols'] = colsAuto(a2);
+  const a3 = [['Parámetro', 'Valor'], ['Año de parámetros', y], ['Exención ISR anual', p.isr.tramos[0].hasta], ['IHSS techo EM', p.ihss.techoEM], ['IHSS techo IVM', p.ihss.techoIVM], ['RAP piso', p.rap.piso], ['RAP tasa empleado', p.rap.tasaEmp], ['INFOP tasa', p.infop.tasa], ['Aviso', 'Prototipo con parámetros por validar con la contadora']];
+  const w3 = XLSX.utils.aoa_to_sheet(a3); w3['!cols'] = [{ wch: 28 }, { wch: 50 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, w1, 'Planilla'); XLSX.utils.book_append_sheet(wb, w2, 'ISR'); XLSX.utils.book_append_sheet(wb, w3, 'Parámetros usados');
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+}
+function decimosXlsx() {
+  const y = S.sel.anio, tipo = ui.decTipo, opts = { incluirVariables: ui.decVar, promedioVariable: ui.decProm };
+  const rows = S.employees.map(e => ({ e, c: calcDecimo(e, tipo, y, opts) })).filter(x => x.c.filas.length);
+  const a = [['Empleado', 'Identidad', 'Meses computables', 'Suma de salarios', 'Entre 12', 'Pagos variables', 'Importe']].concat(rows.map(({ e, c }) => [e.nombre, fmtId(e.identidad), c.meses, c.suma, c.base, c.variable, c.total]), [['TOTAL', '', '', '', '', '', r2(rows.reduce((s, x) => s + x.c.total, 0))]]);
+  const ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = colsAuto(a);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, tipo === 13 ? 'Décimo tercer mes' : 'Décimo cuarto mes');
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+}
+function boletasPdf() {
+  const M = computeMonth(), y = S.sel.anio, m = S.sel.mes; if (!M.act.length) return null;
+  const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'letter' });
+  M.act.forEach(({ emp, r }, i) => {
+    if (i > 0) doc.addPage();
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(S.company.name || '[Nombre de la empresa]', 14, 18);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text('RTN: ' + (S.company.rtn || '-') + '    No. patronal IHSS: ' + (S.company.patronal || '-'), 14, 24);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('BOLETA DE PAGO - ' + MESES[m - 1].toUpperCase() + ' ' + y, 14, 34);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    const info = [['Empleado', emp.nombre], ['Identidad', fmtId(emp.identidad)], ['Cargo', emp.cargo || '-'], ['Fecha de ingreso', fmtFecha(emp.ingreso)], ['Salario mensual', 'L ' + fmt(r.salario)], ['Días pagados', String(r.diasPag)]];
+    info.forEach((x, k) => { doc.setFont('helvetica', 'bold'); doc.text(x[0] + ':', 14, 43 + k * 6); doc.setFont('helvetica', 'normal'); doc.text(String(x[1]), 50, 43 + k * 6); });
+    const ing = [['Sueldo del mes', fmt(r.sueldo)], ['Horas extra', fmt(r.horasExtra)], ['Bonos', fmt(r.bonos)], ['Comisiones', fmt(r.comisiones)]];
+    doc.autoTable({ startY: 84, head: [['INGRESOS', 'L']], body: ing, foot: [['Total ingresos', fmt(r.bruto)]], theme: 'grid', styles: { fontSize: 10 }, headStyles: { fillColor: [31, 95, 191] }, footStyles: { fillColor: [230, 238, 250], textColor: 20 }, columnStyles: { 1: { halign: 'right', cellWidth: 40 } } });
+    const ded = [['IHSS', fmt(r.ihssEmp)], ['RAP', fmt(r.rapEmp)], ['Impuesto sobre la renta (ISR)', fmt(r.isr)], ['Descuento judicial', fmt(r.judicial)], ['Otras deducciones fijas', fmt(r.otrasFijas)], ['Anticipos y otras del mes', fmt(r.anticipos + r.otrasMes)]];
+    doc.autoTable({ startY: doc.lastAutoTable.finalY + 8, head: [['DEDUCCIONES', 'L']], body: ded, foot: [['Total deducciones', fmt(r.deducciones)]], theme: 'grid', styles: { fontSize: 10 }, headStyles: { fillColor: [90, 100, 110] }, footStyles: { fillColor: [240, 238, 232], textColor: 20 }, columnStyles: { 1: { halign: 'right', cellWidth: 40 } } });
+    const yy = doc.lastAutoTable.finalY + 12;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('NETO A PAGAR:', 14, yy); doc.text('L ' + fmt(r.neto), 196, yy, { align: 'right' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.line(14, yy + 32, 90, yy + 32); doc.text('Firma del empleado', 14, yy + 37); doc.line(120, yy + 32, 196, yy + 32); doc.text('Firma del patrono', 120, yy + 37);
+    doc.setFontSize(7.5); doc.setTextColor(120); doc.text('Generado con NoMinaHN (prototipo). Valide los calculos antes de uso oficial.', 14, 270); doc.setTextColor(0);
+  });
+  return doc.output('arraybuffer');
+}
+
+// ---------- Acciones ----------
+function render(keepScroll) {
+  const r = route(), views = { panel: viewPanel, empleados: viewEmpleados, novedades: viewNovedades, planilla: viewPlanilla, decimos: viewDecimos, parametros: viewParametros };
+  const y = window.scrollY;
+  $('#app').innerHTML = shell(r, views[r]());
+  document.title = 'NóminaHN';
+  window.scrollTo(0, keepScroll === false ? 0 : y);
+}
+function validarForm() {
+  const f = ui.form, errs = [];
+  if (!f.nombre.trim()) errs.push('Escribe el nombre completo.');
+  if (digits(f.identidad).length !== 13) errs.push(`La identidad tiene ${digits(f.identidad).length} dígitos; debe tener 13.`);
+  else if (S.employees.some(e => e.identidad === digits(f.identidad) && e.id !== f.id)) errs.push('Ya existe un empleado con esa identidad.');
+  if (!parseISO(f.ingreso)) errs.push('Elige una fecha de ingreso válida.');
+  if (f.retiro && !parseISO(f.retiro)) errs.push('La fecha de retiro no es válida.');
+  if (f.retiro && parseISO(f.retiro) && parseISO(f.ingreso) && parseISO(f.retiro) < parseISO(f.ingreso)) errs.push('El retiro no puede ser antes del ingreso.');
+  if (!(num(f.salario) > 0)) errs.push('El salario debe ser mayor que 0.');
+  return errs;
+}
+document.addEventListener('click', async ev => {
+  const t = ev.target.closest('[data-act]'); if (!t) return;
+  const a = t.dataset.act, id = t.dataset.id;
+  switch (a) {
+    case 'clear-demo': S = makeEmpty(); S.sel.mes = new Date().getMonth() + 1; save(); ui.imp = ui.form = null; render(); toast('Datos de ejemplo borrados.'); break;
+    case 'confirm-no': ui.confirm = null; ui.stash = null; render(); break;
+    case 'backup': { const blob = JSON.stringify(S, null, 1); S.lastBackup = new Date().toISOString(); save(); await saveFile('nominahn-respaldo-' + S.lastBackup.slice(0, 10) + '.json', blob); render(); break; }
+    case 'backup-apply': if (ui.stash) { S = ui.stash; save(); } ui.stash = null; ui.confirm = null; render(); toast('Respaldo importado.'); break;
+    case 'params-copy': { const from = +t.dataset.from, to = +t.dataset.to; if (S.params[from] && !S.params[to]) { S.params[to] = clone(S.params[from]); S.params[to].anio = to; save(); ui.pyear = to; render(); toast(`Parámetros de ${to} creados. Revísalos.`); } break; }
+    case 'params-reset': { const y = +t.dataset.y; const d = clone(DEFAULT_PARAMS_2026); d.anio = y; S.params[y] = d; save(); render(); toast('Valores de referencia restablecidos.'); break; }
+    case 'emp-new': ui.form = blankForm(); ui.imp = null; render(); { const el = $('#f-nombre'); if (el) el.focus(); } break;
+    case 'emp-edit': { const e = S.employees.find(x => x.id === id); if (e) { ui.form = formFromEmp(e); ui.imp = null; render(); const el = $('#f-nombre'); if (el) el.focus(); } break; }
+    case 'emp-cancel': ui.form = null; render(); break;
+    case 'emp-del': ui.confirm = 'del:' + id; render(); break;
+    case 'emp-del-yes': S.employees = S.employees.filter(e => e.id !== id); Object.keys(S.novedades).forEach(k => { delete S.novedades[k][id]; }); ui.confirm = null; save(); render(); break;
+    case 'cam-add': readForm(); ui.form.cambios.push({ desde: '', salario: '' }); render(); break;
+    case 'cam-del': readForm(); ui.form.cambios.splice(+t.dataset.i, 1); render(); break;
+    case 'emp-save': {
+      readForm(); const errs = validarForm(); ui.form.err = errs;
+      if (errs.length) { render(); const el = $('.formcard'); if (el) el.scrollIntoView({ block: 'start' }); break; }
+      const f = ui.form, hasta = Math.max(0, Math.min(11, Math.round(num(f.sHasta))));
+      const e = { id: f.id || uid(), nombre: f.nombre.trim(), identidad: digits(f.identidad), cargo: f.cargo.trim(), ingreso: f.ingreso, retiro: f.retiro || '', salario: num(f.salario), jornada: f.jornada, ihss: f.ihss, rap: f.rap, gastosMedicos: num(f.gastosMedicos), descuentoJudicial: num(f.descuentoJudicial), otrasFijas: num(f.otrasFijas), cambios: f.cambios.filter(c => /^\d{4}-\d{2}$/.test(c.desde) && num(c.salario) > 0).map(c => ({ desde: c.desde, salario: num(c.salario) })), saldo: hasta > 0 ? { anio: S.sel.anio, hasta, ingreso: num(f.sIng), isr: num(f.sIsr) } : null };
+      const i = S.employees.findIndex(x => x.id === e.id); if (i >= 0) S.employees[i] = e; else S.employees.push(e);
+      save(); ui.form = null; render(); toast('Empleado guardado.'); break;
+    }
+    case 'tpl': if (typeof XLSX === 'undefined') toast('La librería de Excel no cargó.'); else await saveFile('nominahn-plantilla.xlsx', plantillaXlsx()); break;
+    case 'imp-cancel': ui.imp = null; render(); break;
+    case 'imp-apply': aplicarImport(); break;
+    case 'exp': ui.exp[id] = !ui.exp[id]; render(); break;
+    case 'xlsx-planilla': if (typeof XLSX === 'undefined') toast('La librería de Excel no cargó.'); else await saveFile(`nominahn-planilla-${S.sel.anio}-${String(S.sel.mes).padStart(2, '0')}.xlsx`, planillaXlsx()); break;
+    case 'xlsx-decimos': if (typeof XLSX === 'undefined') toast('La librería de Excel no cargó.'); else await saveFile(`nominahn-decimo-${ui.decTipo}-${S.sel.anio}.xlsx`, decimosXlsx()); break;
+    case 'pdf-boletas': { if (!window.jspdf) { toast('La librería de PDF no cargó.'); break; } const buf = boletasPdf(); if (buf) await saveFile(`nominahn-boletas-${S.sel.anio}-${String(S.sel.mes).padStart(2, '0')}.pdf`, buf); break; }
+    case 'dec-tipo': ui.decTipo = +t.dataset.t; render(); break;
+  }
+});
+document.addEventListener('change', async ev => {
+  const t = ev.target, d = t.dataset || {};
+  if (t.id === 'selMes') { S.sel.mes = +t.value; save(); render(); return; }
+  if (t.id === 'selAnio') { S.sel.anio = +t.value; save(); render(); return; }
+  if (t.id === 'fileEmp' && t.files[0]) { await importFile(t.files[0]); t.value = ''; return; }
+  if (t.id === 'fileBackup' && t.files[0]) {
+    try { const o = JSON.parse(await t.files[0].text()); if (!Array.isArray(o.employees) || !o.params || !o.sel) throw new Error('x'); ui.stash = o; ui.confirm = 'import'; render(); }
+    catch (e) { toast('Ese archivo no es un respaldo de NóminaHN.'); } t.value = ''; return;
+  }
+  if (d.nov) { const k = ymKey(S.sel.anio, S.sel.mes); S.novedades[k] = S.novedades[k] || {}; const o = S.novedades[k][d.emp] = S.novedades[k][d.emp] || {}; const v = Math.max(0, num(t.value)); if (v) o[d.nov] = v; else delete o[d.nov]; save(); const s = $('#novStatus'); if (s) s.textContent = 'Guardado'; return; }
+  if (d.co) { S.company[d.co] = d.co === 'salarioMinimo' ? num(t.value) : t.value; save(); return; }
+  if (d.p) { const p = S.params[ui.pyear]; const v = d.u === '%' ? num(t.value) / 100 : num(t.value); setP(p, d.p, v); save(); toast('Parámetro guardado.'); return; }
+  if (d.tr !== undefined) { const p = S.params[ui.pyear], row = p.isr.tramos[+d.tr]; row[d.k] = d.k === 'tasa' ? num(t.value) / 100 : num(t.value); save(); toast('Tramo guardado.'); return; }
+  if (t.id === 'decEmp') { ui.decEmp = t.value; render(); return; }
+  if (t.id === 'decVar') { ui.decVar = t.checked; render(); return; }
+  if (t.id === 'decProm') { ui.decProm = num(t.value); render(); return; }
+  if (t.id === 'pyear') { ui.pyear = +t.value; render(); return; }
+});
+document.addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('label.btn[for]')) { ev.preventDefault(); const f = document.getElementById(ev.target.getAttribute('for')); if (f) f.click(); } });
+window.addEventListener('hashchange', () => { ui.form = null; ui.imp = null; ui.confirm = null; render(false); });
+render(false);
+})();
+</script>
+
+</body>
+</html>
