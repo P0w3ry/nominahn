@@ -403,7 +403,7 @@ function shell(r, body) {
   </div>
   <nav class="wrap navin" aria-label="Secciones"><div class="navs">${NAV.map(([k, t]) => `<a href="#${k}" class="${k === r ? 'on' : ''}"${k === r ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</div></nav></header>
   <main class="wrap main">${banners()}${body}</main>
-  <footer class="wrap foot">Prototipo de NóminaHN. ${(S.params[S.sel.anio] && !pendientes(S.params[S.sel.anio]).length) ? 'Los parámetros de ' + S.sel.anio + ' están validados.' : 'Algunos parámetros siguen por validar; revísalos con una contadora antes de usarlos en una planilla real.'} Tus datos se guardan solo en este navegador.</footer>
+  <footer class="wrap foot">Prototipo de NóminaHN. ${(S.params[S.sel.anio] && !pendientes(S.params[S.sel.anio]).length) ? 'Los parámetros de ' + S.sel.anio + ' están validados.' : 'Algunos parámetros siguen por validar; revísalos con finanzas antes de usarlos en una planilla real.'} Tus datos se guardan solo en este navegador.</footer>
   <div id="toast" class="toast" role="status" hidden></div>`;
 }
 function banners() {
@@ -582,12 +582,13 @@ function viewDecimos() {
     else {
       const c = calcDecimo(e, tipo, y, opts);
       const pd = c.periodo, ini = MESES[pd.desde[1] - 1] + ' ' + pd.desde[0], fin = MESES[pd.hasta[1] - 1] + ' ' + pd.hasta[0];
+      const pv = S.params[y], decChip = n => { const k = 'dec.' + n, f = pv && (pv.val || {})[k]; return (f ? chip('ok', 'Validado · ' + fmtFecha(f)) : chip('warn', 'Por validar')) + (pv ? `<label class="ck"><input type="checkbox" data-val="${k}" data-vy="${y}"${f ? ' checked' : ''}> Validado por finanzas</label>` : ''); };
       out = `<div class="result"><div><div class="kl">${nombreT} ${y}</div><div>${esc(e.nombre)}</div></div><div class="big">L ${fmt(c.total)}</div></div>
-      <div class="card tcard"><div class="cardh"><h2>Memoria de cálculo, paso a paso</h2><p class="mut">Cada paso muestra su fórmula. La base legal queda por confirmar con la contadora.</p></div><div class="tw"><table><thead><tr><th>#</th><th>Concepto</th><th>Desarrollo</th><th>Base legal</th><th class="r">Importe</th></tr></thead><tbody>
-      <tr><td class="mono">1</td><td><b>Período computable</b><div class="sub">${esc(periodo)}</div></td><td class="mono sm">${ini} a ${fin}: ${c.meses.toFixed(4)} meses trabajados (base 30 días)</td><td>${chip('warn', 'Por confirmar')}</td><td class="num">${c.meses.toFixed(2)}</td></tr>
-      <tr><td class="mono">2</td><td><b>Salarios del período</b><div class="sub">Salario de cada mes × días trabajados ÷ 30</div></td><td class="sm"><details><summary>Ver los ${c.filas.length} meses</summary><div class="mono sm">${c.filas.map(f => `${MESES[f.m - 1].slice(0, 3)} ${f.y}: ${fmt(f.salario)} × ${f.dias}/30 = ${fmt(f.aporte)}`).join('<br>')}</div></details></td><td>${chip('warn', 'Por confirmar')}</td><td class="num">${fmt(c.suma)}</td></tr>
-      <tr><td class="mono">3</td><td><b>Entre 12 meses</b></td><td class="mono sm">${fmt(c.suma)} ÷ 12</td><td>${chip('warn', 'Por confirmar')}</td><td class="num">${fmt(c.base)}</td></tr>
-      <tr><td class="mono">4</td><td><b>Promedio de pagos variables</b><div class="sub">Horas extra y comisiones (opcional)</div></td><td class="mono sm">${ui.decVar ? `${fmt(ui.decProm)} × ${c.meses.toFixed(4)} ÷ 12` : 'No se incluyen'}</td><td>${chip('warn', 'Por confirmar')}</td><td class="num">${fmt(c.variable)}</td></tr>
+      <div class="card tcard"><div class="cardh"><h2>Memoria de cálculo, paso a paso</h2><p class="mut">Cada paso muestra su fórmula. ${(() => { const pv = S.params[y], n = pv ? DEC_BASES.filter(([k]) => !(pv.val || {})[k]).length : DEC_BASES.length; return n ? `La base legal queda por validar con finanzas (${n} de ${DEC_BASES.length} pendientes).` : 'La base legal de los 4 pasos está validada.'; })()}</p></div><div class="tw"><table><thead><tr><th>#</th><th>Concepto</th><th>Desarrollo</th><th>Base legal</th><th class="r">Importe</th></tr></thead><tbody>
+      <tr><td class="mono">1</td><td><b>Período computable</b><div class="sub">${esc(periodo)}</div></td><td class="mono sm">${ini} a ${fin}: ${c.meses.toFixed(4)} meses trabajados (base 30 días)</td><td>${decChip(1)}</td><td class="num">${c.meses.toFixed(2)}</td></tr>
+      <tr><td class="mono">2</td><td><b>Salarios del período</b><div class="sub">Salario de cada mes × días trabajados ÷ 30</div></td><td class="sm"><details><summary>Ver los ${c.filas.length} meses</summary><div class="mono sm">${c.filas.map(f => `${MESES[f.m - 1].slice(0, 3)} ${f.y}: ${fmt(f.salario)} × ${f.dias}/30 = ${fmt(f.aporte)}`).join('<br>')}</div></details></td><td>${decChip(2)}</td><td class="num">${fmt(c.suma)}</td></tr>
+      <tr><td class="mono">3</td><td><b>Entre 12 meses</b></td><td class="mono sm">${fmt(c.suma)} ÷ 12</td><td>${decChip(3)}</td><td class="num">${fmt(c.base)}</td></tr>
+      <tr><td class="mono">4</td><td><b>Promedio de pagos variables</b><div class="sub">Horas extra y comisiones (opcional)</div></td><td class="mono sm">${ui.decVar ? `${fmt(ui.decProm)} × ${c.meses.toFixed(4)} ÷ 12` : 'No se incluyen'}</td><td>${decChip(4)}</td><td class="num">${fmt(c.variable)}</td></tr>
       <tr class="tot"><td class="mono">5</td><td><b>Importe del ${nombreT.toLowerCase()}</b></td><td class="mono sm">${fmt(c.base)} + ${fmt(c.variable)}</td><td></td><td class="num strong">${fmt(c.total)}</td></tr></tbody></table></div></div>`;
     }
   }
@@ -603,7 +604,7 @@ function viewDecimos() {
 // ---------- 6. Parámetros y empresa ----------
 const PSPEC = [
   ['ISR (personas naturales)', [
-    ['isr.gastosMedicosTope', 'Tope anual de gastos médicos deducibles', 'L', 'v', 'Valor de referencia; confirmar con la contadora.']]],
+    ['isr.gastosMedicosTope', 'Tope anual de gastos médicos deducibles', 'L', 'v', 'Valor de referencia; confirmar con finanzas.']]],
   ['IHSS', [
     ['ihss.techoEM', 'Techo salarial, enfermedad y maternidad', 'L', 'v', 'El techo de 2025 era L 11,903.13; confirmar el de 2026.'],
     ['ihss.techoIVM', 'Techo salarial, invalidez, vejez y muerte', 'L', 'v', 'Cifra reportada por un sitio de terceros para 2026; confirmar.'],
@@ -611,7 +612,7 @@ const PSPEC = [
     ['ihss.ivmEmp', 'Invalidez, vejez y muerte: empleado', '%', 'r', 'Reportado por El Heraldo.'], ['ihss.ivmPat', 'Invalidez, vejez y muerte: patrono', '%', 'r', 'Reportado por El Heraldo.']]],
   ['RAP', [
     ['rap.piso', 'Monto desde el cual se cotiza (piso)', 'L', 'v', 'El comunicado del RAP lo llama a veces techo y a veces piso; confirmar la base.'],
-    ['rap.techo', 'Techo de cotización (0 = sin techo)', 'L', 'v', 'Por definir con la contadora.'],
+    ['rap.techo', 'Techo de cotización (0 = sin techo)', 'L', 'v', 'Por definir con finanzas.'],
     ['rap.tasaEmp', 'Aporte del empleado', '%', 'r', 'Comunicado del RAP.'], ['rap.tasaPat', 'Aporte del patrono', '%', 'r', 'Comunicado del RAP.']]],
   ['INFOP', [['infop.tasa', 'Aporte del patrono sobre el bruto', '%', 'v', 'Tasa de referencia; confirmar si aplica por tamaño de empresa.']]],
   ['Jornada y horas extra', [
@@ -621,6 +622,7 @@ const PSPEC = [
     ['recargos.extraNocturna', 'Recargo de hora extra nocturna', '%', 'r', 'Reportado por El Heraldo (artículo 320).'],
     ['recargos.extraJornadaNocturna', 'Recargo de extra en jornada nocturna', '%', 'r', 'Reportado por El Heraldo (artículo 320).']]]
 ];
+const DEC_BASES = [['dec.1', 'Período computable'], ['dec.2', 'Salarios del período'], ['dec.3', 'División entre 12 meses'], ['dec.4', 'Promedio de pagos variables']];
 const getP = (o, path) => path.split('.').reduce((a, k) => a[k], o);
 const setP = (o, path, v) => { const ks = path.split('.'); const l = ks.pop(); ks.reduce((a, k) => a[k], o)[l] = v; };
 const hoyISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
@@ -629,6 +631,7 @@ function paramItems(p) {
   p.isr.tramos.forEach((t, i) => it.push({ key: 'isr.t' + i, g: 'ISR: tabla progresiva', l: i === 0 ? 'Tramo exento' : 'Tramo ' + (i + 1), st: i < 2 ? 'r' : 'v' }));
   PSPEC.forEach(([g, items]) => items.forEach(([path, l, u, st]) => it.push({ key: path, g, l, st })));
   it.push({ key: 'salarioMinimoPromedio', g: 'Salario mínimo promedio', l: 'Salario mínimo promedio', st: 'r' });
+  DEC_BASES.forEach(([k, l]) => it.push({ key: k, g: 'Décimos: base legal', l, st: 'v' }));
   return it;
 }
 const pendientes = p => p ? paramItems(p).filter(i => !(p.val || {})[i.key]) : [];
@@ -637,7 +640,7 @@ function viewParametros() {
   if (!ui.pyear || !S.params[ui.pyear]) ui.pyear = S.params[S.sel.anio] ? S.sel.anio : years[years.length - 1];
   const p = S.params[ui.pyear], next = Math.max.apply(null, years) + 1;
   const stChip = (s, key) => { const f = (p.val || {})[key]; return f ? chip('ok', 'Validado · ' + fmtFecha(f)) : (s === 'r' ? chip('neutral', 'Reportado, sin validar') : chip('warn', 'Por validar')); };
-  const vck = key => `<label class="ck"><input type="checkbox" data-val="${key}"${(p.val || {})[key] ? ' checked' : ''}> Validado por la contadora</label>`;
+  const vck = key => `<label class="ck"><input type="checkbox" data-val="${key}"${(p.val || {})[key] ? ' checked' : ''}> Validado por finanzas</label>`;
   const vbtn = g => { const its = paramItems(p).filter(i => i.g === g); const all = its.every(i => (p.val || {})[i.key]); return `<div class="row"><button class="btn sm secondary" data-act="val-group" data-g="${esc(g)}">${all ? 'Quitar validación del grupo' : 'Marcar todo el grupo como validado'}</button></div>`; };
   return `<section class="card"><h2>Empresa</h2><div class="fgrid">
     <label class="f wide"><span>Nombre de la empresa</span><input type="text" data-co="name" value="${esc(S.company.name)}"></label>
@@ -651,6 +654,7 @@ function viewParametros() {
     <div class="tw"><table><thead><tr><th>Tramo</th><th class="r">Hasta (L al año)</th><th class="r">Tasa</th><th>Estado</th></tr></thead><tbody>${p.isr.tramos.map((t, i) => `<tr><td>${i === 0 ? 'Exento' : 'Tramo ' + (i + 1)}</td><td>${t.hasta == null ? '<span class="mut">En adelante</span>' : `<input class="ni" type="number" step="any" min="0" data-tr="${i}" data-k="hasta" aria-label="Hasta del tramo ${i + 1}" value="${t.hasta}">`}</td><td><input class="ni" type="number" step="any" min="0" max="100" data-tr="${i}" data-k="tasa" aria-label="Tasa del tramo ${i + 1}" value="${Math.round(num(t.tasa) * 10000) / 100}"> %</td><td>${stChip(i < 2 ? 'r' : 'v', 'isr.t' + i)}${vck('isr.t' + i)}</td></tr>`).join('')}</tbody></table></div></section>
   ${PSPEC.map(([g, items]) => `<section class="card"><h2>${g}</h2>${vbtn(g)}<div class="plist">${items.map(([path, l, u, st, src]) => { const raw = getP(p, path); const v = u === '%' ? Math.round(num(raw) * 10000) / 100 : raw; return `<div class="pi"><label class="f"><span>${l}</span><span class="pin"><input type="number" step="any" min="0" data-p="${path}" data-u="${u}" value="${esc(v)}"> <i>${u}</i></span></label><div>${stChip(st, path)}${vck(path)}<div class="sub">${esc(src)}</div></div></div>`; }).join('')}</div></section>`).join('')}
   <section class="card"><h2>Salario mínimo promedio</h2>${vbtn('Salario mínimo promedio')}<div class="pi"><label class="f"><span>Promedio vigente para efectos tributarios (L)</span><span class="pin"><input type="number" step="any" min="0" data-p="salarioMinimoPromedio" data-u="L" value="${esc(p.salarioMinimoPromedio)}"> <i>L</i></span></label><div>${stChip('r', 'salarioMinimoPromedio')}${vck('salarioMinimoPromedio')}<div class="sub">Comunicado SAR-19-2026 (Acuerdo SETRASS-233-2026).</div></div></div></section>
+  <section class="card"><h2>Décimos: base legal</h2>${vbtn('Décimos: base legal')}<p class="mut">Cada paso de la memoria de cálculo del décimo tercer y cuarto mes. También puedes validarlos desde esa pantalla.</p><div class="plist">${DEC_BASES.map(([k, l]) => `<div class="pi"><div><b>${l}</b></div><div>${stChip('v', k)}${vck(k)}</div></div>`).join('')}</div></section>
   <div class="row"><button class="btn secondary" data-act="params-reset" data-y="${ui.pyear}">Restablecer valores de referencia de ${ui.pyear}</button></div>`;
 }
 
@@ -745,7 +749,7 @@ function planillaXlsx() {
   const h2 = ['Empleado', 'Ingreso anual proyectado', 'Gastos médicos', 'Renta neta gravable', 'ISR anual', 'Retenido antes del mes', 'Meses restantes', 'Retención del mes'];
   const a2 = [h2].concat(M.act.map(({ emp, r }) => [emp.nombre, r.detalleIsr.proyectado, r.detalleIsr.gastosMedicos, r.detalleIsr.renta, r.detalleIsr.isrAnual, r.detalleIsr.retenidoPrevio, r.detalleIsr.mesesRest, r.isr]));
   const w2 = XLSX.utils.aoa_to_sheet(a2); w2['!cols'] = colsAuto(a2);
-  const a3 = [['Parámetro', 'Valor'], ['Año de parámetros', y], ['Exención ISR anual', p.isr.tramos[0].hasta], ['IHSS techo EM', p.ihss.techoEM], ['IHSS techo IVM', p.ihss.techoIVM], ['RAP piso', p.rap.piso], ['RAP tasa empleado', p.rap.tasaEmp], ['INFOP tasa', p.infop.tasa], ['Aviso', 'Prototipo con parámetros por validar con la contadora']];
+  const a3 = [['Parámetro', 'Valor'], ['Año de parámetros', y], ['Exención ISR anual', p.isr.tramos[0].hasta], ['IHSS techo EM', p.ihss.techoEM], ['IHSS techo IVM', p.ihss.techoIVM], ['RAP piso', p.rap.piso], ['RAP tasa empleado', p.rap.tasaEmp], ['INFOP tasa', p.infop.tasa], ['Aviso', 'Prototipo con parámetros por validar con finanzas']];
   const w3 = XLSX.utils.aoa_to_sheet(a3); w3['!cols'] = [{ wch: 28 }, { wch: 50 }];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, w1, 'Planilla'); XLSX.utils.book_append_sheet(wb, w2, 'ISR'); XLSX.utils.book_append_sheet(wb, w3, 'Parámetros usados');
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -846,7 +850,7 @@ document.addEventListener('change', async ev => {
     catch (e) { toast('Ese archivo no es un respaldo de NóminaHN.'); } t.value = ''; return;
   }
   if (d.nov) { const k = ymKey(S.sel.anio, S.sel.mes); S.novedades[k] = S.novedades[k] || {}; const o = S.novedades[k][d.emp] = S.novedades[k][d.emp] || {}; const v = Math.max(0, num(t.value)); if (v) o[d.nov] = v; else delete o[d.nov]; save(); const s = $('#novStatus'); if (s) s.textContent = 'Guardado'; return; }
-  if (d.val !== undefined) { const p = S.params[ui.pyear]; if (p) { p.val = p.val || {}; if (t.checked) p.val[d.val] = hoyISO(); else delete p.val[d.val]; save(); const y = window.scrollY; render(); window.scrollTo(0, y); } return; }
+  if (d.val !== undefined) { const p = S.params[d.vy ? +d.vy : ui.pyear]; if (p) { p.val = p.val || {}; if (t.checked) p.val[d.val] = hoyISO(); else delete p.val[d.val]; save(); const y = window.scrollY; render(); window.scrollTo(0, y); } return; }
   if (d.co) { S.company[d.co] = d.co === 'salarioMinimo' ? num(t.value) : t.value; save(); return; }
   if (d.p) { const p = S.params[ui.pyear]; const v = d.u === '%' ? num(t.value) / 100 : num(t.value); setP(p, d.p, v); save(); toast('Parámetro guardado.'); return; }
   if (d.tr !== undefined) { const p = S.params[ui.pyear], row = p.isr.tramos[+d.tr]; row[d.k] = d.k === 'tasa' ? num(t.value) / 100 : num(t.value); save(); toast('Tramo guardado.'); return; }
