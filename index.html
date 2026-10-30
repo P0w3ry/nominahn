@@ -371,7 +371,7 @@ let storageWarn = false;
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { storageWarn = true; } }
 
 const ui = { form: null, imp: null, exp: {}, confirm: null, decTipo: 13, decEmp: 'all', decVar: false, decProm: 0, pyear: null, stash: null };
-const MANUAL_URL = 'https://claude.ai/artifact/LdeTifHbFr2CVphKcA38Gs';
+const MANUAL_URL = 'https://p0w3ry.github.io/nominahn/Manual_de_usuario_N%C3%B3minaHN.pdf';
 const ROUTES = { panel: '1. Panel principal', empleados: '2. Empleados', novedades: '3. Novedades del mes', planilla: '4. Planilla mensual', decimos: '5. Décimo tercer y cuarto mes', parametros: '6. Parámetros y empresa' };
 const NAV = [['panel', 'Panel'], ['empleados', 'Empleados'], ['novedades', 'Novedades'], ['planilla', 'Planilla'], ['decimos', 'Décimos'], ['parametros', 'Parámetros']];
 const route = () => { const r = (location.hash || '#panel').slice(1).split('?')[0]; return ROUTES[r] ? r : 'panel'; };
