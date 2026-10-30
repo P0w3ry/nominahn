@@ -73,6 +73,7 @@ input:focus-visible, select:focus-visible, .btn:focus-visible, a:focus-visible, 
 .banner.aviso { font-size: 15px; border: 1px solid currentColor; border-left-width: 5px; }
 a.btn { text-decoration: none; }
 .btn.dangerline { border-color: #B3261E; color: #B3261E; background: transparent; } .btn.dangerline:hover:not(:disabled) { background: var(--err-bg); }
+.metodo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 14px 18px; margin-bottom: 14px; }
 .zona { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border2); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .modal-bg { position: fixed; inset: 0; z-index: 50; background: rgba(20, 10, 10, .62); display: flex; align-items: center; justify-content: center; padding: 16px; overflow-y: auto; }
@@ -628,14 +629,13 @@ function viewDecimos() {
     else {
       const c = calcDecimo(e, tipo, y, opts);
       const pd = c.periodo, ini = MESES[pd.desde[1] - 1] + ' ' + pd.desde[0], fin = MESES[pd.hasta[1] - 1] + ' ' + pd.hasta[0];
-      const pv = S.params[y], decChip = n => { const k = 'dec.' + n, f = pv && (pv.val || {})[k]; return (f ? chip('ok', 'Validado · ' + fmtFecha(f)) : chip('warn', 'Por validar')) + (pv ? `<label class="ck"><input type="checkbox" data-val="${k}" data-vy="${y}"${f ? ' checked' : ''}> Validado por finanzas</label>` : ''); };
       out = `<div class="result"><div><div class="kl">${nombreT} ${y}</div><div>${esc(e.nombre)}</div></div><div class="big">L ${fmt(c.total)}</div></div>
-      <div class="card tcard"><div class="cardh"><h2>Memoria de cálculo, paso a paso</h2><p class="mut">Cada paso muestra su fórmula. ${(() => { const pv = S.params[y], n = pv ? DEC_BASES.filter(([k]) => !(pv.val || {})[k]).length : DEC_BASES.length; return n ? `La base legal queda por validar con finanzas (${n} de ${DEC_BASES.length} pendientes).` : 'La base legal de los 4 pasos está validada.'; })()}</p></div><div class="tw"><table><thead><tr><th>#</th><th>Concepto</th><th>Desarrollo</th><th>Base legal</th><th class="r">Importe</th></tr></thead><tbody>
-      <tr><td class="mono">1</td><td><b>Período computable</b><div class="sub">${esc(periodo)}</div></td><td class="mono sm">${ini} a ${fin}: ${c.meses.toFixed(4)} meses trabajados (base 30 días)</td><td>${decChip(1)}</td><td class="num">${c.meses.toFixed(2)}</td></tr>
-      <tr><td class="mono">2</td><td><b>Salarios del período</b><div class="sub">Salario de cada mes × días trabajados ÷ 30</div></td><td class="sm"><details><summary>Ver los ${c.filas.length} meses</summary><div class="mono sm">${c.filas.map(f => `${MESES[f.m - 1].slice(0, 3)} ${f.y}: ${fmt(f.salario)} × ${f.dias}/30 = ${fmt(f.aporte)}`).join('<br>')}</div></details></td><td>${decChip(2)}</td><td class="num">${fmt(c.suma)}</td></tr>
-      <tr><td class="mono">3</td><td><b>Entre 12 meses</b></td><td class="mono sm">${fmt(c.suma)} ÷ 12</td><td>${decChip(3)}</td><td class="num">${fmt(c.base)}</td></tr>
-      <tr><td class="mono">4</td><td><b>Promedio de pagos variables</b><div class="sub">Horas extra y comisiones (opcional)</div></td><td class="mono sm">${ui.decVar ? `${fmt(ui.decProm)} × ${c.meses.toFixed(4)} ÷ 12` : 'No se incluyen'}</td><td>${decChip(4)}</td><td class="num">${fmt(c.variable)}</td></tr>
-      <tr class="tot"><td class="mono">5</td><td><b>Importe del ${nombreT.toLowerCase()}</b></td><td class="mono sm">${fmt(c.base)} + ${fmt(c.variable)}</td><td></td><td class="num strong">${fmt(c.total)}</td></tr></tbody></table></div></div>`;
+      <div class="card tcard"><div class="cardh"><h2>Memoria de cálculo, paso a paso</h2><p class="mut">Cada paso muestra su fórmula.</p></div><div class="tw"><table><thead><tr><th>#</th><th>Concepto</th><th>Desarrollo</th><th class="r">Importe</th></tr></thead><tbody>
+      <tr><td class="mono">1</td><td><b>Período computable</b><div class="sub">${esc(periodo)}</div></td><td class="mono sm">${ini} a ${fin}: ${c.meses.toFixed(4)} meses trabajados (base 30 días)</td><td class="num">${c.meses.toFixed(2)}</td></tr>
+      <tr><td class="mono">2</td><td><b>Salarios del período</b><div class="sub">Salario de cada mes × días trabajados ÷ 30</div></td><td class="sm"><details><summary>Ver los ${c.filas.length} meses</summary><div class="mono sm">${c.filas.map(f => `${MESES[f.m - 1].slice(0, 3)} ${f.y}: ${fmt(f.salario)} × ${f.dias}/30 = ${fmt(f.aporte)}`).join('<br>')}</div></details></td><td class="num">${fmt(c.suma)}</td></tr>
+      <tr><td class="mono">3</td><td><b>Entre 12 meses</b></td><td class="mono sm">${fmt(c.suma)} ÷ 12</td><td class="num">${fmt(c.base)}</td></tr>
+      <tr><td class="mono">4</td><td><b>Promedio de pagos variables</b><div class="sub">Horas extra y comisiones (opcional)</div></td><td class="mono sm">${ui.decVar ? `${fmt(ui.decProm)} × ${c.meses.toFixed(4)} ÷ 12` : 'No se incluyen'}</td><td class="num">${fmt(c.variable)}</td></tr>
+      <tr class="tot"><td class="mono">5</td><td><b>Importe del ${nombreT.toLowerCase()}</b></td><td class="mono sm">${fmt(c.base)} + ${fmt(c.variable)}</td><td class="num strong">${fmt(c.total)}</td></tr></tbody></table></div></div>`;
     }
   }
   return `<div class="bar"><div><h2 class="h2">${nombreT} ${y}</h2><p class="mut">${pago} Período: ${periodo}.</p></div>
@@ -644,6 +644,7 @@ function viewDecimos() {
     <label class="f"><span>Empleado</span><select id="decEmp"><option value="all"${sel === 'all' ? ' selected' : ''}>Toda la planilla</option>${emps.map(e => `<option value="${e.id}"${sel === e.id ? ' selected' : ''}>${esc(e.nombre)}</option>`).join('')}</select></label>
     <label class="ck"><input id="decVar" type="checkbox"${ui.decVar ? ' checked' : ''}> Incluir pagos variables</label>
     ${ui.decVar ? `<label class="f"><span>Promedio mensual de horas extra y comisiones (L)</span><input id="decProm" type="number" step="any" min="0" value="${esc(ui.decProm || '')}"></label>` : ''}</div>
+  ${(() => { const pv = S.params[y]; if (!pv) return ''; const f = (pv.val || {})['dec.metodo']; return `<div class="card metodo"><div><b>Método de cálculo de los décimos</b> ${f ? chip('ok', 'Validado · ' + fmtFecha(f)) : chip('warn', 'Por validar')}<div class="sub">Salario de cada mes del período × días trabajados ÷ 30, sumados y divididos entre 12. Que finanzas confirme que este método es el que aplica en tu empresa.</div></div><label class="ck"><input type="checkbox" data-val="dec.metodo" data-vy="${y}"${f ? ' checked' : ''}> Validado por finanzas</label></div>`; })()}
   ${out}`;
 }
 
@@ -668,7 +669,7 @@ const PSPEC = [
     ['recargos.extraNocturna', 'Recargo de hora extra nocturna', '%', 'r', 'Reportado por El Heraldo (artículo 320).'],
     ['recargos.extraJornadaNocturna', 'Recargo de extra en jornada nocturna', '%', 'r', 'Reportado por El Heraldo (artículo 320).']]]
 ];
-const DEC_BASES = [['dec.1', 'Período computable'], ['dec.2', 'Salarios del período'], ['dec.3', 'División entre 12 meses'], ['dec.4', 'Promedio de pagos variables']];
+const DEC_BASES = [['dec.metodo', 'Método de cálculo de los décimos']];
 const getP = (o, path) => path.split('.').reduce((a, k) => a[k], o);
 const setP = (o, path, v) => { const ks = path.split('.'); const l = ks.pop(); ks.reduce((a, k) => a[k], o)[l] = v; };
 const hoyISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
@@ -677,7 +678,7 @@ function paramItems(p) {
   p.isr.tramos.forEach((t, i) => it.push({ key: 'isr.t' + i, g: 'ISR: tabla progresiva', l: i === 0 ? 'Tramo exento' : 'Tramo ' + (i + 1), st: i < 2 ? 'r' : 'v' }));
   PSPEC.forEach(([g, items]) => items.forEach(([path, l, u, st]) => it.push({ key: path, g, l, st })));
   it.push({ key: 'salarioMinimoPromedio', g: 'Salario mínimo promedio', l: 'Salario mínimo promedio', st: 'r' });
-  DEC_BASES.forEach(([k, l]) => it.push({ key: k, g: 'Décimos: base legal', l, st: 'v' }));
+  DEC_BASES.forEach(([k, l]) => it.push({ key: k, g: 'Décimos: método de cálculo', l, st: 'v' }));
   return it;
 }
 const pendientes = p => p ? paramItems(p).filter(i => !(p.val || {})[i.key]) : [];
@@ -700,7 +701,6 @@ function viewParametros() {
     <div class="tw"><table><thead><tr><th>Tramo</th><th class="r">Hasta (L al año)</th><th class="r">Tasa</th><th>Estado</th></tr></thead><tbody>${p.isr.tramos.map((t, i) => `<tr><td>${i === 0 ? 'Exento' : 'Tramo ' + (i + 1)}</td><td>${t.hasta == null ? '<span class="mut">En adelante</span>' : `<input class="ni" type="number" step="any" min="0" data-tr="${i}" data-k="hasta" aria-label="Hasta del tramo ${i + 1}" value="${t.hasta}">`}</td><td><input class="ni" type="number" step="any" min="0" max="100" data-tr="${i}" data-k="tasa" aria-label="Tasa del tramo ${i + 1}" value="${Math.round(num(t.tasa) * 10000) / 100}"> %</td><td>${stChip(i < 2 ? 'r' : 'v', 'isr.t' + i)}${vck('isr.t' + i)}</td></tr>`).join('')}</tbody></table></div></section>
   ${PSPEC.map(([g, items]) => `<section class="card"><h2>${g}</h2>${vbtn(g)}<div class="plist">${items.map(([path, l, u, st, src]) => { const raw = getP(p, path); const v = u === '%' ? Math.round(num(raw) * 10000) / 100 : raw; return `<div class="pi"><label class="f"><span>${l}</span><span class="pin"><input type="number" step="any" min="0" data-p="${path}" data-u="${u}" value="${esc(v)}"> <i>${u}</i></span></label><div>${stChip(st, path)}${vck(path)}<div class="sub">${esc(src)}</div></div></div>`; }).join('')}</div></section>`).join('')}
   <section class="card"><h2>Salario mínimo promedio</h2>${vbtn('Salario mínimo promedio')}<div class="pi"><label class="f"><span>Promedio vigente para efectos tributarios (L)</span><span class="pin"><input type="number" step="any" min="0" data-p="salarioMinimoPromedio" data-u="L" value="${esc(p.salarioMinimoPromedio)}"> <i>L</i></span></label><div>${stChip('r', 'salarioMinimoPromedio')}${vck('salarioMinimoPromedio')}<div class="sub">Comunicado SAR-19-2026 (Acuerdo SETRASS-233-2026).</div></div></div></section>
-  <section class="card"><h2>Décimos: base legal</h2>${vbtn('Décimos: base legal')}<p class="mut">Cada paso de la memoria de cálculo del décimo tercer y cuarto mes. También puedes validarlos desde esa pantalla.</p><div class="plist">${DEC_BASES.map(([k, l]) => `<div class="pi"><div><b>${l}</b></div><div>${stChip('v', k)}${vck(k)}</div></div>`).join('')}</div></section>
   <div class="row"><button class="btn secondary" data-act="params-reset" data-y="${ui.pyear}">Restablecer valores de referencia de ${ui.pyear}</button></div>`;
 }
 
