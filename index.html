@@ -72,6 +72,16 @@ input:focus-visible, select:focus-visible, .btn:focus-visible, a:focus-visible, 
 .banner.info { background: var(--info-bg); color: var(--info-t); } .banner.warn { background: var(--warn-bg); color: var(--warn-t); } .banner.err { background: var(--err-bg); color: var(--err-t); display: block; }
 .banner.aviso { font-size: 15px; border: 1px solid currentColor; border-left-width: 5px; }
 a.btn { text-decoration: none; }
+.btn.dangerline { border-color: #B3261E; color: #B3261E; background: transparent; } .btn.dangerline:hover:not(:disabled) { background: var(--err-bg); }
+.zona { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border2); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.modal-bg { position: fixed; inset: 0; z-index: 50; background: rgba(20, 10, 10, .62); display: flex; align-items: center; justify-content: center; padding: 16px; overflow-y: auto; }
+.modal { background: var(--surface); color: var(--text); max-width: 560px; width: 100%; border-radius: 16px; border: 3px solid #B3261E; padding: 24px 28px 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); }
+.modal h2 { margin: 6px 0 10px; font-size: 21px; color: var(--err-t); }
+.modal p { margin: 0 0 10px; font-size: 15px; } .modal .m-strong { background: var(--err-bg); color: var(--err-t); font-weight: 700; padding: 10px 12px; border-radius: 10px; }
+.m-ico { width: 56px; height: 56px; border-radius: 50%; background: #B3261E; color: #fff; font-size: 32px; display: flex; align-items: center; justify-content: center; }
+.m-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; } .m-btns .btn { flex: 1 1 200px; } .m-foot { margin: 12px 0 0; font-size: 13px; }
+
 .navs a.man { margin-left: auto; color: var(--muted); }
 .inicio ol { gap: 8px; margin-bottom: 14px; }
 .banner ul { margin: 0; padding-left: 18px; }
@@ -409,7 +419,31 @@ function shell(r, body) {
   </div>
   <nav class="wrap navin" aria-label="Secciones"><div class="navs">${NAV.map(([k, t]) => `<a href="#${k}" class="${k === r ? 'on' : ''}"${k === r ? ' aria-current="page"' : ''}>${t}</a>`).join('')}<a class="man" href="${MANUAL_URL}" target="_blank" rel="noopener">Manual de usuario ↗</a></div></nav></header>
   <main class="wrap main">${banners()}${body}</main>
+  ${ui.confirm === 'mes' ? modalMes() : ui.confirm === 'todo' ? modalTodo() : ''}
   <div id="toast" class="toast" role="status" hidden></div>`;
+}
+function modalTodo() {
+  const nE = S.employees.length, nM = Object.keys(S.novedades).filter(k => Object.keys(S.novedades[k] || {}).length).length;
+  return `<div class="modal-bg" data-act="confirm-no"><div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="mTitle" aria-describedby="mDesc">
+    <div class="m-ico" aria-hidden="true">⚠</div>
+    <h2 id="mTitle">¿Seguro que quieres borrar TODOS los datos y empezar desde cero?</h2>
+    <div id="mDesc"><p>Se borrarán <b>${nE} empleado${nE === 1 ? '' : 's'}</b>, las novedades de <b>${nM} mes${nM === 1 ? '' : 'es'}</b> y los datos de la empresa (nombre, RTN y número patronal).</p>
+    <p class="m-strong">Tendrás que cargar todo otra vez. Esta acción no se puede deshacer.</p>
+    <p class="mut">Se conservan los parámetros de cada año y sus validaciones, y tu último respaldo descargado, si tienes uno.</p></div>
+    <p class="mut"><button class="btn sm secondary" data-act="backup">Descargar un respaldo antes</button></p>
+    <label class="f"><span>Para confirmar, escribe BORRAR</span><input id="delWord" type="text" autocomplete="off" autocapitalize="characters" placeholder="BORRAR"></label>
+    <div class="m-btns"><button id="mesCancel" class="btn secondary" data-act="confirm-no">No, conservar mis datos</button><button id="delTodoBtn" class="btn danger" data-act="todo-del-yes" disabled>Sí, borrar todo y empezar de cero</button></div></div></div>`;
+}
+function modalMes() {
+  const nom = MESES[S.sel.mes - 1] + ' ' + S.sel.anio, n = Object.keys(S.novedades[ymKey(S.sel.anio, S.sel.mes)] || {}).length;
+  return `<div class="modal-bg" data-act="confirm-no"><div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="mTitle" aria-describedby="mDesc">
+    <div class="m-ico" aria-hidden="true">⚠</div>
+    <h2 id="mTitle">¿Seguro que quieres borrar todos los datos de ${esc(nom)}?</h2>
+    <div id="mDesc"><p>Se borrarán las novedades de ${n} empleado${n === 1 ? '' : 's'}: horas extra, bonos, comisiones, ausencias, anticipos y otras deducciones.</p>
+    <p class="m-strong">Tendrás que empezar ${esc(MESES[S.sel.mes - 1])} de nuevo desde cero. Esta acción no se puede deshacer.</p>
+    <p class="mut">Tus empleados, los parámetros y los demás meses no se tocan. Si los meses siguientes ya estaban calculados, se recalcularán sin estas novedades.</p></div>
+    <div class="m-btns"><button id="mesCancel" class="btn secondary" data-act="confirm-no">No, conservar los datos</button><button class="btn danger" data-act="mes-del-yes">Sí, borrar los datos de ${esc(nom)}</button></div>
+    <p class="mut m-foot">¿Dudas? Cancela y descarga un respaldo desde el Panel antes de borrar.</p></div></div>`;
 }
 function banners() {
   const pv = S.params[S.sel.anio], ok = pv && !pendientes(pv).length;
@@ -454,6 +488,7 @@ function viewPanel() {
       <p class="mut">${S.lastBackup ? `Último respaldo: hace ${dias} día${dias === 1 ? '' : 's'}.` : 'Aún no has descargado un respaldo.'} Tus datos viven solo en este navegador; si borras los datos del sitio, se pierden.</p>
       <div class="row"><button class="btn" data-act="backup">Descargar respaldo</button>
       <label class="btn secondary" for="fileBackup" tabindex="0">Importar respaldo</label><input type="file" id="fileBackup" accept=".json,application/json" hidden></div>
+      <div class="row zona"><button class="btn sm secondary dangerline" data-act="todo-del"${(S.employees.length || Object.keys(S.novedades).length || S.company.name) ? '' : ' disabled title="No hay datos para borrar"'}>Borrar todos los datos y empezar de cero</button></div>
       ${ui.confirm === 'import' ? `<div class="confirm"><b>Esto reemplaza todos los datos actuales.</b> <button class="btn sm danger" data-act="backup-apply">Sí, reemplazar</button> <button class="btn sm secondary" data-act="confirm-no">Cancelar</button></div>` : ''}
     </div>
     ${(() => { const pp = S.params[S.sel.anio]; if (!pp) return `<div class="card"><h2>Parámetros ${S.sel.anio}</h2><p class="mut">Este año aún no tiene parámetros.</p><p class="mut"><a href="#parametros">Crear los parámetros</a></p>`; const all = paramItems(pp), pend = pendientes(pp), grupos = []; pend.forEach(i => { let g = grupos.find(x => x.g === i.g); if (!g) grupos.push(g = { g: i.g, n: 0, dud: 0 }); g.n++; if (i.st === 'v') g.dud++; });
@@ -538,7 +573,9 @@ const NOVF = [['heDiurna', 'H. extra diurnas (25%)'], ['heNocturna', 'H. extra n
 function viewNovedades() {
   const y = S.sel.anio, m = S.sel.mes, k = ymKey(y, m), list = S.employees.filter(e => diasPagadosMes(e, y, m) !== null);
   const body = list.map(e => { const nv = (S.novedades[k] || {})[e.id] || {}; return `<tr><td><b>${esc(e.nombre)}</b><div class="sub">${esc(e.cargo || '')}</div></td>${NOVF.map(([f, l]) => `<td><input class="ni" type="number" step="any" min="0" inputmode="decimal" aria-label="${esc(l + ' de ' + e.nombre)}" data-nov="${f}" data-emp="${e.id}" value="${nv[f] ? nv[f] : ''}" placeholder="0"></td>`).join('')}</tr>`; }).join('');
-  return `<div class="bar"><div><h2 class="h2">Novedades de ${MESES[m - 1]} ${y}</h2><p class="mut">Lo que cambia cada mes. Se guarda al salir de cada casilla. <span id="novStatus" class="ok-t"></span></p></div></div>
+  const hayNov = Object.keys(S.novedades[k] || {}).length > 0;
+  return `<div class="bar"><div><h2 class="h2">Novedades de ${MESES[m - 1]} ${y}</h2><p class="mut">Lo que cambia cada mes. Se guarda al salir de cada casilla. <span id="novStatus" class="ok-t"></span></p></div>
+    <div class="row"><button class="btn secondary dangerline" data-act="mes-del"${hayNov ? '' : ' disabled title="Este mes no tiene datos para borrar"'}>Borrar datos de ${MESES[m - 1]}</button></div></div>
   ${list.length ? `<div class="card tcard"><div class="tw"><table class="nt"><thead><tr><th>Empleado</th>${NOVF.map(([, l]) => `<th class="r">${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div></div>` : '<div class="card empty"><b>No hay empleados activos en este mes.</b></div>'}
   <p class="mut">Las horas extra se pagan con la tarifa por hora de cada jornada y el recargo de la pantalla de parámetros.</p>`;
 }
@@ -815,10 +852,15 @@ function validarForm() {
 }
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act]'); if (!t) return;
+  if (t.classList.contains('modal-bg') && ev.target !== t) return;
   const a = t.dataset.act, id = t.dataset.id;
   switch (a) {
     case 'clear-demo': { const prev = S, n = makeEmpty(); n.params = prev.params; n.lastBackup = prev.lastBackup; n.sel = prev.sel; if (prev.company.name !== DEMO_CO) n.company = prev.company; S = n; save(); ui.imp = ui.form = null; render(); toast('Datos de ejemplo borrados.'); break; }
     case 'load-demo': { if (S.employees.length) break; const prev = S, d = makeDemo(); d.params = prev.params; d.lastBackup = prev.lastBackup; if (prev.company.name) d.company = Object.assign({}, prev.company); d.sel = { anio: 2026, mes: 10 }; S = d; save(); ui.imp = ui.form = null; render(); toast('Datos de ejemplo cargados. Puedes borrarlos cuando quieras.'); break; }
+    case 'todo-del': ui.confirm = 'todo'; render(); { const el = $('#delWord'); if (el) el.focus(); } break;
+    case 'todo-del-yes': { const el = $('#delWord'); if (!el || el.value.trim().toUpperCase() !== 'BORRAR') break; const prev = S, n = makeEmpty(); n.params = prev.params; n.lastBackup = prev.lastBackup; n.sel = prev.sel; n.company.salarioMinimo = prev.company.salarioMinimo; S = n; ui.confirm = null; ui.imp = ui.form = null; ui.exp = {}; save(); location.hash = '#panel'; render(); toast('Todos los datos fueron borrados. Puedes empezar desde cero.'); break; }
+    case 'mes-del': ui.confirm = 'mes'; render(); { const el = $('#mesCancel'); if (el) el.focus(); } break;
+    case 'mes-del-yes': { const k = ymKey(S.sel.anio, S.sel.mes), nom = MESES[S.sel.mes - 1] + ' ' + S.sel.anio; delete S.novedades[k]; ui.confirm = null; save(); render(); toast('Datos de ' + nom + ' borrados. Puedes empezar el mes de nuevo.'); break; }
     case 'confirm-no': ui.confirm = null; ui.stash = null; render(); break;
     case 'backup': { const blob = JSON.stringify(S, null, 1); S.lastBackup = new Date().toISOString(); save(); await saveFile('nominahn-respaldo-' + S.lastBackup.slice(0, 10) + '.json', blob); render(); break; }
     case 'backup-apply': if (ui.stash) { S = ui.stash; save(); } ui.stash = null; ui.confirm = null; render(); toast('Respaldo importado.'); break;
@@ -850,6 +892,7 @@ document.addEventListener('click', async ev => {
     case 'dec-tipo': ui.decTipo = +t.dataset.t; render(); break;
   }
 });
+document.addEventListener('input', ev => { if (ev.target && ev.target.id === 'delWord') { const b = $('#delTodoBtn'); if (b) b.disabled = ev.target.value.trim().toUpperCase() !== 'BORRAR'; } });
 document.addEventListener('change', async ev => {
   const t = ev.target, d = t.dataset || {};
   if (t.id === 'selMes') { S.sel.mes = +t.value; save(); render(); return; }
@@ -869,7 +912,7 @@ document.addEventListener('change', async ev => {
   if (t.id === 'decProm') { ui.decProm = num(t.value); render(); return; }
   if (t.id === 'pyear') { ui.pyear = +t.value; render(); return; }
 });
-document.addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('label.btn[for]')) { ev.preventDefault(); const f = document.getElementById(ev.target.getAttribute('for')); if (f) f.click(); } });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && (ui.confirm === 'mes' || ui.confirm === 'todo')) { ui.confirm = null; render(); return; } if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('label.btn[for]')) { ev.preventDefault(); const f = document.getElementById(ev.target.getAttribute('for')); if (f) f.click(); } });
 window.addEventListener('hashchange', () => { ui.form = null; ui.imp = null; ui.confirm = null; render(false); });
 render(false);
 })();
