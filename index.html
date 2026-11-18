@@ -159,6 +159,19 @@ const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v == 
 const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 const clone = o => JSON.parse(JSON.stringify(o));
 
+// Completa parámetros guardados con los campos nuevos (sin pisar lo que el usuario ya cambió)
+function migrarParams(p) {
+  const d = DEFAULT_PARAMS_2026;
+  const fill = (o, def) => { Object.keys(def).forEach(k => { if (o[k] === undefined) o[k] = clone(def[k]); else if (def[k] && typeof def[k] === 'object' && !Array.isArray(def[k])) fill(o[k], def[k]); }); };
+  fill(p, d);
+  if (p.isr && p.isr.tramos && p.isr.tramos[2] && Math.abs(num(p.isr.tramos[2].hasta) - 809660.72) < 0.001) p.isr.tramos[2].hasta = 809660.75;
+  return p;
+}
+function edadAl(fechaNac, y, m, d) {
+  const n = parseISO(fechaNac); if (!n) return null;
+  let e = y - n.getFullYear(); if (m < n.getMonth() + 1 || (m === n.getMonth() + 1 && d < n.getDate())) e--; return e;
+}
+
 function parseISO(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
   if (!m) return null;
@@ -172,13 +185,16 @@ const DEFAULT_PARAMS_2026 = {
     tramos: [
       { hasta: 228324.32, tasa: 0 },
       { hasta: 348154.10, tasa: 0.15 },
-      { hasta: 809660.72, tasa: 0.20 },
+      { hasta: 809660.75, tasa: 0.20 },
       { hasta: null, tasa: 0.25 }
     ],
-    gastosMedicosTope: 40000
+    gastosMedicosTope: 40000,
+    gastosMedicosTope65: 80000
   },
   ihss: { techoEM: 11903.13, techoIVM: 12498.29, emEmp: 0.025, emPat: 0.05, ivmEmp: 0.025, ivmPat: 0.035 },
   rap: { piso: 11903.13, techo: 0, tasaEmp: 0.015, tasaPat: 0.015 },
+  reserva: { tasaPat: 0.04, techo: 57896.16 },
+  afp: { tasaEmp: 0, tasaPat: 0, piso: 0, techo: 0 },
   infop: { tasa: 0.01 },
   jornada: { horasDiurna: 8, horasNocturna: 6, horasMixta: 7 },
   recargos: { extraDiurna: 0.25, extraNocturna: 0.50, extraJornadaNocturna: 0.75 },
@@ -246,38 +262,58 @@ function calcMes(emp, y, m, nov, p, acc) {
   const bruto = r2(sueldo + horasExtra + bonos + comisiones);
 
   const baseEM = Math.min(bruto, p.ihss.techoEM), baseIVM = Math.min(bruto, p.ihss.techoIVM);
-  const ihssEmp = emp.ihss ? r2(baseEM * p.ihss.emEmp + baseIVM * p.ihss.ivmEmp) : 0;
-  const ihssPat = emp.ihss ? r2(baseEM * p.ihss.emPat + baseIVM * p.ihss.ivmPat) : 0;
+  const emEmp = emp.ihss ? r2(baseEM * p.ihss.emEmp) : 0, ivmEmp = emp.ihss ? r2(baseIVM * p.ihss.ivmEmp) : 0;
+  const emPat = emp.ihss ? r2(baseEM * p.ihss.emPat) : 0, ivmPat = emp.ihss ? r2(baseIVM * p.ihss.ivmPat) : 0;
+  const ihssEmp = r2(emEmp + ivmEmp), ihssPat = r2(emPat + ivmPat);
   const techoRap = p.rap.techo > 0 ? p.rap.techo : Infinity;
   const baseRap = emp.rap ? Math.max(0, Math.min(bruto, techoRap) - p.rap.piso) : 0;
   const rapEmp = r2(baseRap * p.rap.tasaEmp), rapPat = r2(baseRap * p.rap.tasaPat);
+  const reservaPat = emp.rap ? r2(Math.min(bruto, p.reserva.techo > 0 ? p.reserva.techo : Infinity) * p.reserva.tasaPat) : 0;
+  const afpOn = emp.afp !== false;
+  const techoAfp = p.afp.techo > 0 ? p.afp.techo : Infinity;
+  const baseAfp = afpOn ? Math.max(0, Math.min(bruto, techoAfp) - num(p.afp.piso)) : 0;
+  const afpEmp = r2(baseAfp * p.afp.tasaEmp), afpPat = r2(baseAfp * p.afp.tasaPat);
   const infop = r2(bruto * p.infop.tasa);
 
-  // ISR: proyección anual con recálculo cada mes
+  // ISR: retención mensual FIJA sobre el salario anualizado (salario × 12); el último mes del año (o del retiro)
+  // se ajusta contra el ISR real del año, como se hace en la práctica contable.
   const ret = emp.retiro ? parseISO(emp.retiro) : null;
   const mesFinal = (ret && ret.getFullYear() === y) ? ret.getMonth() + 1 : 12;
-  const mesesRest = Math.max(1, mesFinal - m + 1);
-  let proyRest = 0;
-  for (let k = m + 1; k <= mesFinal; k++) proyRest += (diasPagadosMes(emp, y, k) || 0) / 30 * salarioEn(emp, y, k);
-  const proyectado = r2(acc.ingreso + bruto + proyRest);
-  const gm = Math.min(Math.max(0, num(emp.gastosMedicos)), p.isr.gastosMedicosTope);
-  const renta = Math.max(0, r2(proyectado - gm));
-  const isrAnualV = isrAnual(renta, p.isr.tramos);
-  const porRetener = r2(isrAnualV - acc.isr);
-  const isr = Math.max(0, r2(porRetener / mesesRest));
+  // Deducción por gastos médicos y educativos: automática según la ley (mayores de 65 años, tope mayor)
+  const edad = edadAl(emp.fechaNac, y, 12, 31);
+  const gm = (edad !== null && edad >= 65 && num(p.isr.gastosMedicosTope65) > 0) ? num(p.isr.gastosMedicosTope65) : num(p.isr.gastosMedicosTope);
+  const variable = r2(horasExtra + bonos + comisiones);
+  let isr, detalleIsr;
+  if (m < mesFinal) {
+    const nMeses = (ret && ret.getFullYear() === y) ? mesFinal : 12; // con retiro ya registrado, solo se proyectan los meses que se trabajarán
+    const salarioAnual = r2(sal * nMeses), variables = r2(num(acc.variable) + variable);
+    const proyectado = r2(salarioAnual + variables);
+    const renta = Math.max(0, r2(proyectado - gm));
+    const isrAnualV = isrAnual(renta, p.isr.tramos);
+    const factor = dias < 30 ? dias / 30 : 1;
+    isr = r2(isrAnualV / nMeses * factor);
+    detalleIsr = { modo: 'mensual', nMeses, salarioAnual, variables, proyectado, gastosMedicos: gm, renta, isrAnual: isrAnualV, factor, retenidoPrevio: r2(acc.isr), porRetener: isr, negativo: false };
+  } else {
+    const real = r2(acc.ingreso + bruto);
+    const renta = Math.max(0, r2(real - gm));
+    const isrAnualV = isrAnual(renta, p.isr.tramos);
+    const porRetener = r2(isrAnualV - acc.isr);
+    isr = Math.max(0, porRetener);
+    detalleIsr = { modo: 'cierre', nMeses: 0, salarioAnual: 0, variables: 0, proyectado: real, gastosMedicos: gm, renta, isrAnual: isrAnualV, factor: 1, retenidoPrevio: r2(acc.isr), porRetener, negativo: porRetener < 0 };
+  }
 
   const judicial = r2(num(emp.descuentoJudicial));
   const otrasFijas = r2(num(emp.otrasFijas));
   const anticipos = r2(num(nov.anticipos));
   const otrasMes = r2(num(nov.otrasDeducciones));
-  const deducciones = r2(ihssEmp + rapEmp + isr + judicial + otrasFijas + anticipos + otrasMes);
+  const deducciones = r2(ihssEmp + rapEmp + afpEmp + isr + judicial + otrasFijas + anticipos + otrasMes);
   const neto = r2(bruto - deducciones);
 
   return {
     salario: sal, dias, ausencias, diasPag, sueldo, heD, heN, heJ, horasExtra, bonos, comisiones, bruto,
-    ihssEmp, rapEmp, isr, judicial, otrasFijas, anticipos, otrasMes, deducciones, neto,
-    ihssPat, rapPat, infop, costoPatrono: r2(ihssPat + rapPat + infop),
-    detalleIsr: { proyectado, ingresoPrevio: r2(acc.ingreso), gastosMedicos: gm, renta, isrAnual: isrAnualV, retenidoPrevio: r2(acc.isr), mesesRest, porRetener, negativo: porRetener < 0 }
+    ihssEmp, rapEmp, afpEmp, emEmp, ivmEmp, emPat, ivmPat, reservaPat, afpPat, isr, judicial, otrasFijas, anticipos, otrasMes, deducciones, neto,
+    ihssPat, rapPat, infop, costoPatrono: r2(ihssPat + rapPat + reservaPat + afpPat + infop),
+    detalleIsr
   };
 }
 
@@ -286,14 +322,14 @@ function calcHasta(emp, y, m, novFn, p) {
   let acc = { ingreso: 0, isr: 0 }, start = 1;
   const s = emp.saldo;
   if (s && num(s.anio) === y && num(s.hasta) > 0) {
-    acc = { ingreso: num(s.ingreso), isr: num(s.isr) };
+    acc = { ingreso: num(s.ingreso), isr: num(s.isr), variable: 0 };
     start = Math.min(12, Math.round(num(s.hasta))) + 1;
     if (m < start) return 'saldo';
   }
   let res = null;
   for (let k = start; k <= m; k++) {
     const r = calcMes(emp, y, k, novFn(y, k, emp.id), p, acc);
-    if (r) acc = { ingreso: acc.ingreso + r.bruto, isr: acc.isr + r.isr };
+    if (r) acc = { ingreso: acc.ingreso + r.bruto, isr: acc.isr + r.isr, variable: num(acc.variable) + r.horasExtra + r.bonos + r.comisiones };
     if (k === m) res = r;
   }
   return res;
@@ -350,13 +386,13 @@ function makeDemo() {
   S0.sel = { anio: 2026, mes: now.getFullYear() === 2026 ? now.getMonth() + 1 : 10 };
   S0.demo = true;
   S0.company.name = DEMO_CO;
-  const base = { jornada: 'Diurna', ihss: true, rap: true, gastosMedicos: 0, descuentoJudicial: 0, otrasFijas: 0, cambios: [], saldo: null, retiro: '' };
+  const base = { jornada: 'Diurna', ihss: true, rap: true, afp: true, fechaNac: '', descuentoJudicial: 0, otrasFijas: 0, cambios: [], saldo: null, retiro: '' };
   S0.employees = [
     Object.assign({}, base, { id: uid() + 'a', nombre: 'Marta Elena Reyes', identidad: '0801198501234', cargo: 'Contadora', ingreso: '2019-04-01', salario: 28500 }),
     Object.assign({}, base, { id: uid() + 'b', nombre: 'Carlos Andrés Mejía', identidad: '0501199005678', cargo: 'Supervisor de ventas', ingreso: '2021-08-16', salario: 19800 }),
     Object.assign({}, base, { id: uid() + 'c', nombre: 'Iris Daniela Flores', identidad: '0801199509012', cargo: 'Asistente administrativa', ingreso: '2023-02-01', salario: 15200 }),
     Object.assign({}, base, { id: uid() + 'd', nombre: 'José Luis Ordóñez', identidad: '1301198803456', cargo: 'Bodeguero', ingreso: '2024-06-03', salario: 11800 }),
-    Object.assign({}, base, { id: uid() + 'e', nombre: 'Ana Patricia Zelaya', identidad: '0801198207890', cargo: 'Gerente', ingreso: '2021-03-15', salario: 48000, gastosMedicos: 40000, cambios: [{ desde: '2026-06', salario: 52000 }] })
+    Object.assign({}, base, { id: uid() + 'e', nombre: 'Ana Patricia Zelaya', identidad: '0801198207890', cargo: 'Gerente', ingreso: '2021-03-15', salario: 48000, cambios: [{ desde: '2026-06', salario: 52000 }] })
   ];
   const k = ymKey(2026, 10);
   S0.novedades[k] = {};
@@ -367,11 +403,12 @@ function makeDemo() {
 let S = null;
 try { const raw = localStorage.getItem(KEY); if (raw) S = JSON.parse(raw); } catch (e) { S = null; }
 if (!S || !Array.isArray(S.employees)) S = makeEmpty();
+if (S.params) Object.keys(S.params).forEach(y => migrarParams(S.params[y]));
 let storageWarn = false;
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { storageWarn = true; } }
 
 const ui = { form: null, imp: null, exp: {}, confirm: null, decTipo: 13, decEmp: 'all', decVar: false, decProm: 0, pyear: null, stash: null };
-const MANUAL_URL = 'https://p0w3ry.github.io/nominahn/Manual_de_usuario_N%C3%B3minaHN.pdf';
+const MANUAL_URL = 'https://claude.ai/artifact/LdeTifHbFr2CVphKcA38Gs';
 const ROUTES = { panel: '1. Panel principal', empleados: '2. Empleados', novedades: '3. Novedades del mes', planilla: '4. Planilla mensual', decimos: '5. Décimo tercer y cuarto mes', parametros: '6. Parámetros y empresa' };
 const NAV = [['panel', 'Panel'], ['empleados', 'Empleados'], ['novedades', 'Novedades'], ['planilla', 'Planilla'], ['decimos', 'Décimos'], ['parametros', 'Parámetros']];
 const route = () => { const r = (location.hash || '#panel').slice(1).split('?')[0]; return ROUTES[r] ? r : 'panel'; };
@@ -380,15 +417,7 @@ const route = () => { const r = (location.hash || '#panel').slice(1).split('?')[
 let DL = null;
 (async () => { try { if (window.claude && claude.use) DL = await claude.use('downloads'); } catch (e) { DL = null; } })();
 async function saveFile(name, data) {
-  if (!DL) {
-    try {
-      const blob = new Blob([data], { type: 'application/octet-stream' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
-      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      toast('Archivo listo: ' + name);
-    } catch (e) { toast('No se pudo guardar el archivo.'); }
-    return;
-  }
+  if (!DL) { toast('Las descargas no están disponibles en esta vista.'); return; }
   try { await DL.save({ filename: name, data }); toast('Archivo listo: ' + name); }
   catch (e) { if (e && e.code === 'declined') return; toast('No se pudo guardar el archivo (' + ((e && e.code) || 'error') + ').'); }
 }
@@ -403,7 +432,7 @@ function computeMonth() {
   const rows = S.employees.map(emp => ({ emp, r: calcHasta(emp, y, m, novFn, p) }));
   const act = rows.filter(x => x.r && x.r !== 'saldo');
   const sum = k => r2(act.reduce((a, x) => a + x.r[k], 0));
-  return { p, rows, act, tot: { n: act.length, sueldo: sum('sueldo'), horasExtra: sum('horasExtra'), otros: r2(sum('bonos') + sum('comisiones')), bruto: sum('bruto'), ihss: sum('ihssEmp'), rap: sum('rapEmp'), isr: sum('isr'), otras: r2(sum('judicial') + sum('otrasFijas') + sum('anticipos') + sum('otrasMes')), deducciones: sum('deducciones'), neto: sum('neto'), costo: sum('costoPatrono'), ihssPat: sum('ihssPat'), rapPat: sum('rapPat'), infop: sum('infop') } };
+  return { p, rows, act, tot: { n: act.length, sueldo: sum('sueldo'), horasExtra: sum('horasExtra'), otros: r2(sum('bonos') + sum('comisiones')), bruto: sum('bruto'), ihss: sum('ihssEmp'), rap: sum('rapEmp'), isr: sum('isr'), otras: r2(sum('judicial') + sum('otrasFijas') + sum('anticipos') + sum('otrasMes')), deducciones: sum('deducciones'), neto: sum('neto'), costo: sum('costoPatrono'), ihssPat: sum('ihssPat'), rapPat: sum('rapPat'), infop: sum('infop'), emEmp: sum('emEmp'), ivmEmp: sum('ivmEmp'), emPat: sum('emPat'), ivmPat: sum('ivmPat'), reservaPat: sum('reservaPat'), afpEmp: sum('afpEmp'), afpPat: sum('afpPat') } };
 }
 const otrasDed = r => r2(r.judicial + r.otrasFijas + r.anticipos + r.otrasMes);
 
@@ -466,7 +495,7 @@ function viewPanel() {
   const alerts = [];
   M.act.forEach(x => {
     if (x.r.salario < num(S.company.salarioMinimo)) alerts.push(['warn', `${x.emp.nombre} tiene un salario de L ${fmt(x.r.salario)}, menor al mínimo configurado (L ${fmt(S.company.salarioMinimo)}). Revisa el sector o el salario.`]);
-    if (x.r.detalleIsr.negativo) alerts.push(['warn', `${x.emp.nombre}: ya se retuvo más ISR del que corresponde a la proyección; este mes retiene L 0.00.`]);
+    if (x.r.detalleIsr.negativo) alerts.push(['warn', `${x.emp.nombre}: en el ajuste de cierre, el ISR real del año es menor a lo ya retenido; este mes retiene L 0.00 y la diferencia queda a favor del empleado.`]);
   });
   M.rows.filter(x => x.r === 'saldo').forEach(x => alerts.push(['info', `${x.emp.nombre}: ${mesTxt} queda cubierto por su saldo inicial.`]));
   const dias = S.lastBackup ? Math.floor((Date.now() - new Date(S.lastBackup).getTime()) / 86400000) : null;
@@ -508,14 +537,14 @@ function viewPanel() {
 }
 
 // ---------- 2. Empleados ----------
-const blankForm = () => ({ id: null, nombre: '', identidad: '', cargo: '', ingreso: '', retiro: '', salario: '', jornada: 'Diurna', ihss: true, rap: true, gastosMedicos: 0, descuentoJudicial: 0, otrasFijas: 0, cambios: [], sHasta: 0, sIng: 0, sIsr: 0, err: [] });
-function formFromEmp(e) { const s = e.saldo || {}; return { id: e.id, nombre: e.nombre, identidad: e.identidad, cargo: e.cargo || '', ingreso: e.ingreso, retiro: e.retiro || '', salario: e.salario, jornada: e.jornada, ihss: !!e.ihss, rap: !!e.rap, gastosMedicos: e.gastosMedicos || 0, descuentoJudicial: e.descuentoJudicial || 0, otrasFijas: e.otrasFijas || 0, cambios: clone(e.cambios || []), sHasta: s.hasta || 0, sIng: s.ingreso || 0, sIsr: s.isr || 0, err: [] }; }
+const blankForm = () => ({ id: null, nombre: '', identidad: '', cargo: '', ingreso: '', retiro: '', salario: '', jornada: 'Diurna', ihss: true, rap: true, afp: true, fechaNac: '', descuentoJudicial: 0, otrasFijas: 0, cambios: [], sHasta: 0, sIng: 0, sIsr: 0, err: [] });
+function formFromEmp(e) { const s = e.saldo || {}; return { id: e.id, nombre: e.nombre, identidad: e.identidad, cargo: e.cargo || '', ingreso: e.ingreso, retiro: e.retiro || '', salario: e.salario, jornada: e.jornada, ihss: !!e.ihss, rap: !!e.rap, afp: e.afp !== false, fechaNac: e.fechaNac || '', descuentoJudicial: e.descuentoJudicial || 0, otrasFijas: e.otrasFijas || 0, cambios: clone(e.cambios || []), sHasta: s.hasta || 0, sIng: s.ingreso || 0, sIsr: s.isr || 0, err: [] }; }
 function readForm() {
   if (!ui.form) return;
   const g = id => { const el = $('#' + id); return el ? el.value : ''; }, f = ui.form;
   if (!$('#f-nombre')) return;
   f.nombre = g('f-nombre'); f.identidad = g('f-identidad'); f.cargo = g('f-cargo'); f.ingreso = g('f-ingreso'); f.retiro = g('f-retiro'); f.salario = g('f-salario'); f.jornada = g('f-jornada');
-  f.ihss = $('#f-ihss').checked; f.rap = $('#f-rap').checked; f.gastosMedicos = g('f-gm'); f.descuentoJudicial = g('f-jud'); f.otrasFijas = g('f-otras');
+  f.ihss = $('#f-ihss').checked; f.rap = $('#f-rap').checked; f.afp = $('#f-afp').checked; f.fechaNac = g('f-nac'); f.descuentoJudicial = g('f-jud'); f.otrasFijas = g('f-otras');
   f.sHasta = g('f-sh'); f.sIng = g('f-si'); f.sIsr = g('f-sisr');
   f.cambios = f.cambios.map((c, i) => ({ desde: g('cd-' + i), salario: g('cs-' + i) }));
 }
@@ -533,7 +562,8 @@ function formPanel() {
     <label class="f"><span>Tipo de jornada</span><select id="f-jornada">${['Diurna', 'Nocturna', 'Mixta'].map(j => `<option${f.jornada === j ? ' selected' : ''}>${j}</option>`).join('')}</select></label>
     <label class="ck"><input id="f-ihss" type="checkbox"${f.ihss ? ' checked' : ''}> Cotiza al IHSS</label>
     <label class="ck"><input id="f-rap" type="checkbox"${f.rap ? ' checked' : ''}> Aporta al RAP</label>
-    ${n('f-gm', 'Gastos médicos deducibles del año (L)', f.gastosMedicos)}
+    <label class="ck"><input id="f-afp" type="checkbox"${f.afp ? ' checked' : ''}> Aporta a AFP (si aplica según los parámetros)</label>
+    <label class="f"><span>Fecha de nacimiento (opcional)</span><input id="f-nac" type="date" value="${esc(f.fechaNac)}"><small class="mut">Sirve para aplicar la deducción de gastos médicos que corresponde por ley (más alta desde los 65 años).</small></label>
     ${n('f-jud', 'Descuento judicial mensual (L)', f.descuentoJudicial)}
     ${n('f-otras', 'Otras deducciones fijas mensuales (L)', f.otrasFijas)}
   </div>
@@ -582,31 +612,61 @@ function viewNovedades() {
 }
 
 // ---------- 4. Planilla ----------
+function aportesFilas(t, hasAfp) {
+  const f = [['IHSS: enfermedad y maternidad', t.emEmp, t.emPat], ['IHSS: invalidez, vejez y muerte', t.ivmEmp, t.ivmPat], ['RAP: fondo de vivienda (FOVIIF)', t.rap, t.rapPat], ['RAP: fondo de reserva laboral', 0, t.reservaPat]];
+  if (hasAfp) f.push(['AFP (fondo de pensiones)', t.afpEmp, t.afpPat]);
+  f.push(['INFOP', 0, t.infop]);
+  return f;
+}
+function resumenAportes(M) {
+  const t = M.tot, hasAfp = num(M.p.afp.tasaEmp) > 0 || num(M.p.afp.tasaPat) > 0, fil = aportesFilas(t, hasAfp);
+  const te = r2(fil.reduce((a, x) => a + x[1], 0)), tp = r2(fil.reduce((a, x) => a + x[2], 0));
+  const por = M.act.map(({ emp, r }) => `<tr><td><b>${esc(emp.nombre)}</b></td><td class="num">${fmt(r.ihssPat)}</td><td class="num">${fmt(r.rapPat)}</td><td class="num">${fmt(r.reservaPat)}</td>${hasAfp ? `<td class="num">${fmt(r.afpPat)}</td>` : ''}<td class="num">${fmt(r.infop)}</td><td class="num strong">${fmt(r.costoPatrono)}</td></tr>`).join('');
+  return `<section class="card tcard"><div class="cardh"><h2>Seguridad social y aportes del mes</h2><p class="mut">Lo que se descuenta al empleado y lo que paga el patrono, por concepto. Sirve para el ajuste contable.</p></div>
+    <div class="tw"><table><thead><tr><th>Concepto</th><th class="r">Empleado</th><th class="r">Patrono</th><th class="r">Total</th></tr></thead><tbody>
+    ${fil.map(([c, e, p]) => `<tr><td>${c}</td><td class="num">${fmt(e)}</td><td class="num">${fmt(p)}</td><td class="num">${fmt(r2(e + p))}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total aportes</td><td class="num">${fmt(te)}</td><td class="num">${fmt(tp)}</td><td class="num">${fmt(r2(te + tp))}</td></tr></tfoot></table></div>
+    <div class="cardh"><h3 class="h3">Aportes del patrono por empleado</h3></div>
+    <div class="tw"><table><thead><tr><th>Empleado</th><th class="r">IHSS</th><th class="r">RAP vivienda</th><th class="r">Reserva laboral</th>${hasAfp ? '<th class="r">AFP</th>' : ''}<th class="r">INFOP</th><th class="r">Total</th></tr></thead><tbody>${por}</tbody>
+    <tfoot><tr><td>Totales</td><td class="num">${fmt(t.ihssPat)}</td><td class="num">${fmt(t.rapPat)}</td><td class="num">${fmt(t.reservaPat)}</td>${hasAfp ? `<td class="num">${fmt(t.afpPat)}</td>` : ''}<td class="num">${fmt(t.infop)}</td><td class="num">${fmt(t.costo)}</td></tr></tfoot></table></div>
+    <p class="mut cardh">El ISR retenido (L ${fmt(t.isr)}) se paga al SAR y no está incluido aquí.</p></section>`;
+}
 function viewPlanilla() {
   const M = computeMonth(), y = S.sel.anio, m = S.sel.mes;
   if (!M.p) return '<div class="card empty"><b>Faltan los parámetros de este año.</b></div>';
-  const t = M.tot;
+  const t = M.tot, hasAfp = num(M.p.afp.tasaEmp) > 0;
   const body = M.rows.map(({ emp, r }) => {
     if (!r) return '';
-    if (r === 'saldo') return `<tr class="dim"><td><b>${esc(emp.nombre)}</b></td><td colspan="9">Cubierto por el saldo inicial; no se calcula en la app.</td></tr>`;
+    if (r === 'saldo') return `<tr class="dim"><td><b>${esc(emp.nombre)}</b></td><td colspan="${hasAfp ? 10 : 9}">Cubierto por el saldo inicial; no se calcula en la app.</td></tr>`;
     const open = ui.exp[emp.id];
     const warn = [];
     if (r.salario < num(S.company.salarioMinimo)) warn.push('Salario menor al mínimo configurado');
     if (r.detalleIsr.negativo) warn.push('ISR: ya se retuvo de más');
     const d = r.detalleIsr;
     return `<tr class="${open ? 'open' : ''}"><td><button class="lnk" data-act="exp" data-id="${emp.id}" aria-expanded="${open ? 'true' : 'false'}"><b>${esc(emp.nombre)}</b></button><div class="sub">${esc(emp.cargo || '')}</div>${warn.map(w => `<div>${chip('warn', w)}</div>`).join('')}</td>
-      <td class="num">${fmt(r.sueldo)}</td><td class="num">${fmt(r.horasExtra)}</td><td class="num">${fmt(r.bonos + r.comisiones)}</td><td class="num strong">${fmt(r.bruto)}</td><td class="num">${fmt(r.ihssEmp)}</td><td class="num">${fmt(r.rapEmp)}</td><td class="num">${fmt(r.isr)}</td><td class="num">${fmt(otrasDed(r))}</td><td class="num strong">${fmt(r.neto)}</td></tr>
-    ${open ? `<tr class="detail"><td colspan="10"><div class="dgrid">
+      <td class="num">${fmt(r.sueldo)}</td><td class="num">${fmt(r.horasExtra)}</td><td class="num">${fmt(r.bonos + r.comisiones)}</td><td class="num strong">${fmt(r.bruto)}</td><td class="num">${fmt(r.ihssEmp)}</td><td class="num">${fmt(r.rapEmp)}</td>${hasAfp ? `<td class="num">${fmt(r.afpEmp)}</td>` : ''}<td class="num">${fmt(r.isr)}</td><td class="num">${fmt(otrasDed(r))}</td><td class="num strong">${fmt(r.neto)}</td></tr>
+    ${open ? `<tr class="detail"><td colspan="${hasAfp ? 11 : 10}"><div class="dgrid">
       <div><h3>Ingresos</h3><dl><dt>Salario mensual vigente</dt><dd>L ${fmt(r.salario)}</dd><dt>Días pagados (base 30)</dt><dd>${r.diasPag}${r.ausencias ? ` (${r.ausencias} de ausencia)` : ''}</dd><dt>Sueldo del mes</dt><dd>L ${fmt(r.sueldo)}</dd><dt>Horas extra</dt><dd>L ${fmt(r.horasExtra)}</dd><dt>Bonos y comisiones</dt><dd>L ${fmt(r.bonos + r.comisiones)}</dd></dl></div>
-      <div><h3>ISR: proyección anual</h3><dl><dt>Ingreso anual proyectado</dt><dd>L ${fmt(d.proyectado)}</dd><dt>Gastos médicos deducidos</dt><dd>L ${fmt(d.gastosMedicos)}</dd><dt>Renta neta gravable</dt><dd>L ${fmt(d.renta)}</dd><dt>ISR anual (tabla ${y})</dt><dd>L ${fmt(d.isrAnual)}</dd><dt>Ya retenido antes de este mes</dt><dd>L ${fmt(d.retenidoPrevio)}</dd><dt>Por retener ÷ ${d.mesesRest} mes${d.mesesRest === 1 ? '' : 'es'}</dt><dd>L ${fmt(d.porRetener)} → <b>L ${fmt(r.isr)}</b></dd></dl></div>
-      <div><h3>Costo del patrono (aparte)</h3><dl><dt>IHSS patronal</dt><dd>L ${fmt(r.ihssPat)}</dd><dt>RAP patronal</dt><dd>L ${fmt(r.rapPat)}</dd><dt>INFOP</dt><dd>L ${fmt(r.infop)}</dd><dt>Total</dt><dd><b>L ${fmt(r.costoPatrono)}</b></dd></dl><h3>Otras deducciones</h3><dl><dt>Descuento judicial</dt><dd>L ${fmt(r.judicial)}</dd><dt>Otras fijas</dt><dd>L ${fmt(r.otrasFijas)}</dd><dt>Anticipos y otras del mes</dt><dd>L ${fmt(r.anticipos + r.otrasMes)}</dd></dl></div>
+      <div><h3>ISR: ${d.modo === 'cierre' ? 'ajuste de cierre' : 'retención del mes'}</h3><dl>${d.modo === 'cierre'
+        ? `<dt>Ingreso real del año</dt><dd>L ${fmt(d.proyectado)}</dd>`
+        : `<dt>Salario × ${d.nMeses} meses</dt><dd>L ${fmt(d.salarioAnual)}</dd>${d.variables ? `<dt>Horas extra, bonos y comisiones del año</dt><dd>L ${fmt(d.variables)}</dd>` : ''}<dt>Ingreso anual</dt><dd>L ${fmt(d.proyectado)}</dd>`}<dt>Deducción por gastos médicos (automática por ley)</dt><dd>L ${fmt(d.gastosMedicos)}</dd><dt>Renta neta gravable</dt><dd>L ${fmt(d.renta)}</dd><dt>ISR anual (tabla ${y})</dt><dd>L ${fmt(d.isrAnual)}</dd>${d.modo === 'cierre'
+        ? `<dt>Ya retenido en el año</dt><dd>L ${fmt(d.retenidoPrevio)}</dd><dt>Ajuste: ISR real − retenido</dt><dd>L ${fmt(d.porRetener)} → <b>L ${fmt(r.isr)}</b></dd>`
+        : `<dt>÷ ${d.nMeses} meses${d.factor < 1 ? ` × ${r.diasPag}/30 días` : ''}</dt><dd><b>L ${fmt(r.isr)}</b></dd>`}</dl>${d.modo === 'cierre' ? '<p class="sub">El último mes del año (o del retiro) se ajusta contra el ISR real.</p>' : ''}</div>
+      <div><h3>Seguridad social y aportes</h3><table class="mini"><thead><tr><th></th><th class="r">Empleado</th><th class="r">Patrono</th></tr></thead><tbody>
+        <tr><td>IHSS enfermedad y maternidad</td><td class="num">${fmt(r.emEmp)}</td><td class="num">${fmt(r.emPat)}</td></tr>
+        <tr><td>IHSS invalidez, vejez y muerte</td><td class="num">${fmt(r.ivmEmp)}</td><td class="num">${fmt(r.ivmPat)}</td></tr>
+        <tr><td>RAP: fondo de vivienda</td><td class="num">${fmt(r.rapEmp)}</td><td class="num">${fmt(r.rapPat)}</td></tr>
+        <tr><td>RAP: reserva laboral</td><td class="num">0.00</td><td class="num">${fmt(r.reservaPat)}</td></tr>
+        <tr><td>AFP</td><td class="num">${fmt(r.afpEmp)}</td><td class="num">${fmt(r.afpPat)}</td></tr>
+        <tr><td>INFOP</td><td class="num">0.00</td><td class="num">${fmt(r.infop)}</td></tr>
+        <tr class="tot"><td>Costo del patrono</td><td></td><td class="num"><b>${fmt(r.costoPatrono)}</b></td></tr></tbody></table><h3>Otras deducciones</h3><dl><dt>Descuento judicial</dt><dd>L ${fmt(r.judicial)}</dd><dt>Otras fijas</dt><dd>L ${fmt(r.otrasFijas)}</dd><dt>Anticipos y otras del mes</dt><dd>L ${fmt(r.anticipos + r.otrasMes)}</dd></dl></div>
     </div></td></tr>` : ''}`;
   }).join('');
   return `<div class="bar"><div><h2 class="h2">Planilla de ${MESES[m - 1]} ${y}</h2><p class="mut">Toca el nombre de un empleado para ver el desglose y el cálculo del ISR.</p></div>
     <div class="row"><button class="btn secondary" data-act="xlsx-planilla"${t && t.n ? '' : ' disabled'}>Exportar a Excel</button><button class="btn" data-act="pdf-boletas"${t && t.n ? '' : ' disabled'}>Generar boletas (PDF)</button></div></div>
   <section class="kpis sm"><div class="kpi"><div class="kl">Bruto</div><div class="kv">L ${fmt(t.bruto)}</div></div><div class="kpi"><div class="kl">Deducciones</div><div class="kv">L ${fmt(t.deducciones)}</div></div><div class="kpi"><div class="kl">Neto a pagar</div><div class="kv">L ${fmt(t.neto)}</div></div><div class="kpi"><div class="kl">Costo del patrono</div><div class="kv">L ${fmt(t.costo)}</div></div></section>
-  ${S.employees.length ? `<div class="card tcard"><div class="tw"><table class="pt"><thead><tr><th>Empleado</th><th class="r">Sueldo</th><th class="r">H. extra</th><th class="r">Otros ingresos</th><th class="r">Bruto</th><th class="r">IHSS</th><th class="r">RAP</th><th class="r">ISR</th><th class="r">Otras ded.</th><th class="r">Neto</th></tr></thead><tbody>${body}</tbody>
-  <tfoot><tr><td>Totales (${t.n})</td><td class="num">${fmt(t.sueldo)}</td><td class="num">${fmt(t.horasExtra)}</td><td class="num">${fmt(t.otros)}</td><td class="num">${fmt(t.bruto)}</td><td class="num">${fmt(t.ihss)}</td><td class="num">${fmt(t.rap)}</td><td class="num">${fmt(t.isr)}</td><td class="num">${fmt(t.otras)}</td><td class="num">${fmt(t.neto)}</td></tr></tfoot></table></div></div>` : '<div class="card empty"><b>No hay empleados.</b></div>'}
+  ${S.employees.length ? `<div class="card tcard"><div class="tw"><table class="pt"><thead><tr><th>Empleado</th><th class="r">Sueldo</th><th class="r">H. extra</th><th class="r">Otros ingresos</th><th class="r">Bruto</th><th class="r">IHSS</th><th class="r">RAP</th>${hasAfp ? '<th class="r">AFP</th>' : ''}<th class="r">ISR</th><th class="r">Otras ded.</th><th class="r">Neto</th></tr></thead><tbody>${body}</tbody>
+  <tfoot><tr><td>Totales (${t.n})</td><td class="num">${fmt(t.sueldo)}</td><td class="num">${fmt(t.horasExtra)}</td><td class="num">${fmt(t.otros)}</td><td class="num">${fmt(t.bruto)}</td><td class="num">${fmt(t.ihss)}</td><td class="num">${fmt(t.rap)}</td>${hasAfp ? `<td class="num">${fmt(t.afpEmp)}</td>` : ''}<td class="num">${fmt(t.isr)}</td><td class="num">${fmt(t.otras)}</td><td class="num">${fmt(t.neto)}</td></tr></tfoot></table></div></div>${resumenAportes(M)}` : '<div class="card empty"><b>No hay empleados.</b></div>'}
   <p class="mut">Cada mes se recalcula con las novedades guardadas. Valores en lempiras.</p>`;
 }
 
@@ -651,16 +711,25 @@ function viewDecimos() {
 // ---------- 6. Parámetros y empresa ----------
 const PSPEC = [
   ['ISR (personas naturales)', [
-    ['isr.gastosMedicosTope', 'Tope anual de gastos médicos deducibles', 'L', 'v', 'Valor de referencia; confirmar con finanzas.']]],
+    ['isr.gastosMedicosTope', 'Deducción anual por gastos médicos y educativos', 'L', 'r', 'Art. 13 de la Ley del ISR (guía del SAR): hasta L 40,000. Se aplica automáticamente a todos los empleados.'],
+    ['isr.gastosMedicosTope65', 'Deducción anual para mayores de 65 años', 'L', 'r', 'Guía del SAR (Decreto 59-2020): hasta L 80,000. Se aplica si el empleado tiene fecha de nacimiento registrada.']]],
   ['IHSS', [
     ['ihss.techoEM', 'Techo salarial, enfermedad y maternidad', 'L', 'v', 'El techo de 2025 era L 11,903.13; confirmar el de 2026.'],
     ['ihss.techoIVM', 'Techo salarial, invalidez, vejez y muerte', 'L', 'v', 'Cifra reportada por un sitio de terceros para 2026; confirmar.'],
     ['ihss.emEmp', 'Enfermedad y maternidad: empleado', '%', 'r', 'Reportado por El Heraldo.'], ['ihss.emPat', 'Enfermedad y maternidad: patrono', '%', 'r', 'Reportado por El Heraldo.'],
     ['ihss.ivmEmp', 'Invalidez, vejez y muerte: empleado', '%', 'r', 'Reportado por El Heraldo.'], ['ihss.ivmPat', 'Invalidez, vejez y muerte: patrono', '%', 'r', 'Reportado por El Heraldo.']]],
-  ['RAP', [
+  ['RAP: fondo de vivienda (FOVIIF)', [
     ['rap.piso', 'Monto desde el cual se cotiza (piso)', 'L', 'v', 'El comunicado del RAP lo llama a veces techo y a veces piso; confirmar la base.'],
     ['rap.techo', 'Techo de cotización (0 = sin techo)', 'L', 'v', 'Por definir con finanzas.'],
     ['rap.tasaEmp', 'Aporte del empleado', '%', 'r', 'Comunicado del RAP.'], ['rap.tasaPat', 'Aporte del patrono', '%', 'r', 'Comunicado del RAP.']]],
+  ['RAP: fondo de reserva laboral', [
+    ['reserva.tasaPat', 'Aporte del patrono sobre el salario ordinario', '%', 'v', 'Ley del Fondo de Reserva Laboral (Decreto 47-2024): 4% a cargo solo del patrono. Confirmar si aplica a tu empresa.'],
+    ['reserva.techo', 'Techo de cotización (0 = sin techo)', 'L', 'v', 'Reportado: 3 salarios mínimos de referencia (L 57,896.16); confirmar.']]],
+  ['AFP (fondo de pensiones)', [
+    ['afp.tasaEmp', 'Aporte del empleado', '%', 'v', 'Pendiente: confirmar con finanzas si es obligatorio y su porcentaje. En 0 no se calcula.'],
+    ['afp.tasaPat', 'Aporte del patrono', '%', 'v', 'Pendiente: confirmar con finanzas. En 0 no se calcula.'],
+    ['afp.piso', 'Monto desde el cual se cotiza (piso)', 'L', 'v', 'Pendiente de confirmar. Normalmente 0.'],
+    ['afp.techo', 'Techo de cotización (0 = sin techo)', 'L', 'v', 'Pendiente de confirmar.']]],
   ['INFOP', [['infop.tasa', 'Aporte del patrono sobre el bruto', '%', 'v', 'Tasa de referencia; confirmar si aplica por tamaño de empresa.']]],
   ['Jornada y horas extra', [
     ['jornada.horasDiurna', 'Horas de la jornada diurna', 'h', 'v', 'El Código de Trabajo fija 8 diarias y 44 semanales.'],
@@ -705,21 +774,26 @@ function viewParametros() {
 }
 
 // ---------- Excel y PDF ----------
-const EMP_H = ['Nombre completo', 'Identidad', 'Cargo', 'Fecha de ingreso (AAAA-MM-DD)', 'Salario base mensual', 'Jornada', 'Cotiza IHSS', 'Aporta RAP', 'Gastos médicos anuales', 'Descuento judicial mensual', 'Otras deducciones fijas', 'Aumento desde (AAAA-MM)', 'Salario nuevo', 'Saldo: meses cubiertos', 'Saldo: ingreso acumulado', 'Saldo: ISR retenido'];
-const NOV_H = ['Identidad', 'Horas extra diurnas', 'Horas extra nocturnas', 'Horas extra jornada nocturna', 'Bonos', 'Comisiones', 'Días de ausencia sin goce', 'Anticipos', 'Otras deducciones'];
+const EMP_H = ['Nombre completo', 'Identidad', 'Fecha de ingreso', 'Salario mensual', 'Cargo', 'Jornada', 'Fecha de nacimiento'];
+const NOV_H = ['Identidad', 'Horas extra diurnas', 'Horas extra nocturnas', 'Bonos', 'Comisiones', 'Días de ausencia sin goce', 'Anticipos'];
 function plantillaXlsx() {
   const wb = XLSX.utils.book_new();
   const w1 = XLSX.utils.aoa_to_sheet([EMP_H]); w1['!cols'] = EMP_H.map(h => ({ wch: Math.max(14, h.length + 2) }));
   const w2 = XLSX.utils.aoa_to_sheet([NOV_H]); w2['!cols'] = NOV_H.map(h => ({ wch: Math.max(14, h.length + 2) }));
-  const ins = [['Cómo llenar la plantilla de NóminaHN'], [''], ['Hoja Empleados: una fila por empleado. Borra las filas que no uses.'], ['Hoja Novedades: horas extra, bonos y ausencias del mes seleccionado en la app. Se busca al empleado por su identidad.'], [''],
-    ['Columna', 'Qué escribir', 'Ejemplo'],
-    ['Nombre completo', 'Nombre y apellidos', 'María López Pérez'], ['Identidad', '13 dígitos, con o sin guiones. La columna ya está en formato Texto para conservar el 0 inicial; si pegas datos de otro lugar, escríbela con guiones.', '0801-1990-12345'], ['Fecha de ingreso', 'Año-mes-día', '2024-03-15'], ['Salario base mensual', 'En lempiras, sin símbolo', '15200'],
-    ['Jornada', 'Diurna, Nocturna o Mixta', 'Diurna'], ['Cotiza IHSS / Aporta RAP', 'Sí o No (vacío = Sí)', 'Sí'], ['Gastos médicos anuales', 'Total deducible del año', '0'],
-    ['Aumento desde / Salario nuevo', 'Mes del aumento (AAAA-MM) y el nuevo salario', '2026-06 / 17000'], ['Saldo', 'Solo si empiezas a mitad de año: meses ya pagados (0 a 11), ingreso acumulado e ISR retenido', '9 / 136800 / 4100']];
-  // Columna Identidad en formato Texto (filas 2 a 301) para que Excel conserve el 0 inicial
-  const txt = (ws, col) => { const rg = XLSX.utils.decode_range(ws['!ref']); for (let r = 1; r <= 300; r++) ws[XLSX.utils.encode_cell({ r, c: col })] = { t: 's', v: '', z: '@' }; rg.e.r = 300; ws['!ref'] = XLSX.utils.encode_range(rg); };
-  txt(w1, 1); txt(w2, 0);
-  const w3 = XLSX.utils.aoa_to_sheet(ins); w3['!cols'] = [{ wch: 34 }, { wch: 70 }, { wch: 22 }];
+  const ins = [['Cómo llenar la plantilla de NóminaHN'], [''],
+    ['Hoja Empleados: una fila por empleado. Solo estos datos son obligatorios:'],
+    ['Nombre completo', 'Ejemplo: María López Pérez'],
+    ['Identidad', '13 dígitos, con o sin guiones. Ejemplo: 0801-1990-12345'],
+    ['Fecha de ingreso', 'Ejemplo: 2024-03-15 (año-mes-día) o 15/03/2024'],
+    ['Salario mensual', 'En lempiras, sin símbolo. Ejemplo: 15200'], [''],
+    ['Opcionales:'],
+    ['Cargo', 'Solo para mostrarlo en la planilla y las boletas.'],
+    ['Jornada', 'Diurna, Nocturna o Mixta. Si lo dejas vacío, se usa Diurna.'],
+    ['Fecha de nacimiento', 'Sirve para la deducción de gastos médicos de los mayores de 65 años. Si la dejas vacía, se usa la deducción general.'], [''],
+    ['La app calcula sola: IHSS, RAP, AFP, ISR (con la deducción de gastos médicos), horas extra y décimos.'],
+    ['Aumentos de salario, descuentos judiciales y saldos iniciales se agregan en la app, con Editar empleado.'], [''],
+    ['Hoja Novedades (opcional): horas extra, bonos, comisiones, ausencias y anticipos del mes seleccionado en la app. Se busca al empleado por su identidad.']];
+  const w3 = XLSX.utils.aoa_to_sheet(ins); w3['!cols'] = [{ wch: 34 }, { wch: 90 }];
   XLSX.utils.book_append_sheet(wb, w1, 'Empleados'); XLSX.utils.book_append_sheet(wb, w2, 'Novedades'); XLSX.utils.book_append_sheet(wb, w3, 'Instrucciones');
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
 }
@@ -744,7 +818,7 @@ async function importFile(file) {
     rows.forEach((row, i) => {
       const fila = i + 2, msgs = []; let status = 'ok';
       const nombre = String(pick(row, ['nombre completo', 'nombre']) || '').trim(), idnRaw = digits(pick(row, ['identidad', 'dni', 'numero de identidad'])), idn = idnFix(idnRaw);
-      const ingreso = fechaAny(pick(row, ['fecha de ingreso aaaa mm dd', 'fecha de ingreso', 'ingreso'])), salario = num(pick(row, ['salario base mensual', 'salario base', 'salario']));
+      const ingreso = fechaAny(pick(row, ['fecha de ingreso aaaa mm dd', 'fecha de ingreso', 'ingreso'])), salario = num(pick(row, ['salario mensual', 'salario base mensual', 'salario base', 'salario']));
       if (!nombre && !idn && !salario) return;
       if (!nombre) { status = 'err'; msgs.push(`Fila ${fila}: falta el nombre.`); }
       if (idnRaw.length === 12) { if (status === 'ok') status = 'warn'; msgs.push(`Fila ${fila}: la identidad tenía 12 dígitos (Excel quita el 0 inicial); se agregó el 0 al principio. Revísala.`); }
@@ -758,7 +832,7 @@ async function importFile(file) {
       if (status !== 'err' && salario < minimo) { status = 'warn'; msgs.push(`Fila ${fila}: salario menor al mínimo configurado (L ${fmt(minimo)}).`); }
       const cd = String(pick(row, ['aumento desde aaaa mm', 'aumento desde']) || '').trim(), cs = num(pick(row, ['salario nuevo']));
       const sh2 = Math.max(0, Math.min(11, Math.round(num(pick(row, ['saldo meses cubiertos'])))));
-      const emp = { nombre, identidad: idn, cargo: String(pick(row, ['cargo']) || '').trim(), ingreso, retiro: '', salario, jornada, ihss: siNo(pick(row, ['cotiza ihss', 'ihss']), true), rap: siNo(pick(row, ['aporta rap', 'rap']), true), gastosMedicos: num(pick(row, ['gastos medicos anuales', 'gastos medicos'])), descuentoJudicial: num(pick(row, ['descuento judicial mensual', 'descuento judicial'])), otrasFijas: num(pick(row, ['otras deducciones fijas', 'otras deducciones fijas mensuales'])), cambios: (/^\d{4}-\d{2}$/.test(cd) && cs > 0) ? [{ desde: cd, salario: cs }] : [], saldo: sh2 > 0 ? { anio: S.sel.anio, hasta: sh2, ingreso: num(pick(row, ['saldo ingreso acumulado'])), isr: num(pick(row, ['saldo isr retenido'])) } : null };
+      const emp = { nombre, identidad: idn, cargo: String(pick(row, ['cargo']) || '').trim(), ingreso, retiro: '', salario, jornada, ihss: siNo(pick(row, ['cotiza ihss', 'ihss']), true), rap: siNo(pick(row, ['aporta rap', 'rap']), true), fechaNac: fechaAny(pick(row, ['fecha de nacimiento', 'fecha de nacimiento aaaa mm dd', 'nacimiento'])), afp: true, descuentoJudicial: num(pick(row, ['descuento judicial mensual', 'descuento judicial'])), otrasFijas: num(pick(row, ['otras deducciones fijas', 'otras deducciones fijas mensuales'])), cambios: (/^\d{4}-\d{2}$/.test(cd) && cs > 0) ? [{ desde: cd, salario: cs }] : [], saldo: sh2 > 0 ? { anio: S.sel.anio, hasta: sh2, ingreso: num(pick(row, ['saldo ingreso acumulado'])), isr: num(pick(row, ['saldo isr retenido'])) } : null };
       out.push({ fila, status, msgs, nombre: nombre || '(sin nombre)', identidad: fmtId(idn) || String(pick(row, ['identidad']) || ''), salario, emp });
     });
     const nov = [];
@@ -778,7 +852,7 @@ function aplicarImport() {
   const I = ui.imp; if (!I) return; let nuevos = 0, act = 0;
   I.rows.filter(r => r.status !== 'err').forEach(r => {
     const ex = S.employees.find(e => e.identidad === r.emp.identidad);
-    if (ex) { Object.assign(ex, r.emp, { id: ex.id, retiro: ex.retiro || '' }); act++; } else { S.employees.push(Object.assign({ id: uid() }, r.emp)); nuevos++; }
+    if (ex) { const n = r.emp; Object.assign(ex, { nombre: n.nombre, ingreso: n.ingreso, salario: n.salario, jornada: n.jornada }); if (n.cargo) ex.cargo = n.cargo; if (n.fechaNac) ex.fechaNac = n.fechaNac; act++; } else { S.employees.push(Object.assign({ id: uid() }, r.emp)); nuevos++; }
   });
   const k = ymKey(S.sel.anio, S.sel.mes);
   I.nov.filter(n => n.status === 'ok').forEach(n => { const e = S.employees.find(x => x.identidad === n.idn); if (!e) return; S.novedades[k] = S.novedades[k] || {}; const v = {}; Object.keys(n.v).forEach(f => { if (n.v[f]) v[f] = n.v[f]; }); S.novedades[k][e.id] = v; });
@@ -787,17 +861,21 @@ function aplicarImport() {
 function colsAuto(aoa) { const w = []; aoa.forEach(r => r.forEach((c, i) => { w[i] = Math.max(w[i] || 10, Math.min(40, String(c == null ? '' : c).length + 2)); })); return w.map(x => ({ wch: x })); }
 function planillaXlsx() {
   const M = computeMonth(), y = S.sel.anio, m = S.sel.mes, p = M.p;
-  const head = ['Identidad', 'Empleado', 'Cargo', 'Días pagados', 'Sueldo', 'Horas extra', 'Bonos y comisiones', 'Bruto', 'IHSS', 'RAP', 'ISR', 'Desc. judicial', 'Otras deducciones', 'Total deducciones', 'Neto a pagar', 'IHSS patronal', 'RAP patronal', 'INFOP', 'Costo patrono'];
-  const rows = M.act.map(({ emp, r }) => [fmtId(emp.identidad), emp.nombre, emp.cargo, r.diasPag, r.sueldo, r.horasExtra, r2(r.bonos + r.comisiones), r.bruto, r.ihssEmp, r.rapEmp, r.isr, r.judicial, r2(r.otrasFijas + r.anticipos + r.otrasMes), r.deducciones, r.neto, r.ihssPat, r.rapPat, r.infop, r.costoPatrono]);
-  const t = M.tot, tot = ['', 'TOTALES', '', '', t.sueldo, t.horasExtra, t.otros, t.bruto, t.ihss, t.rap, t.isr, r2(M.act.reduce((a, x) => a + x.r.judicial, 0)), r2(t.otras - M.act.reduce((a, x) => a + x.r.judicial, 0)), t.deducciones, t.neto, t.ihssPat, t.rapPat, t.infop, t.costo];
+  const hasAfp = num(p.afp.tasaEmp) > 0 || num(p.afp.tasaPat) > 0, t = M.tot;
+  const head = ['Identidad', 'Empleado', 'Cargo', 'Días pagados', 'Sueldo', 'Horas extra', 'Bonos y comisiones', 'Bruto', 'IHSS empleado', 'RAP empleado (vivienda)'].concat(hasAfp ? ['AFP empleado'] : [], ['ISR', 'Desc. judicial', 'Otras deducciones', 'Total deducciones', 'Neto a pagar', 'IHSS patrono', 'RAP patrono (vivienda)', 'RAP reserva laboral (patrono)'], hasAfp ? ['AFP patrono'] : [], ['INFOP', 'Costo patrono']);
+  const rows = M.act.map(({ emp, r }) => [fmtId(emp.identidad), emp.nombre, emp.cargo, r.diasPag, r.sueldo, r.horasExtra, r2(r.bonos + r.comisiones), r.bruto, r.ihssEmp, r.rapEmp].concat(hasAfp ? [r.afpEmp] : [], [r.isr, r.judicial, r2(r.otrasFijas + r.anticipos + r.otrasMes), r.deducciones, r.neto, r.ihssPat, r.rapPat, r.reservaPat], hasAfp ? [r.afpPat] : [], [r.infop, r.costoPatrono]));
+  const jud = r2(M.act.reduce((a, x) => a + x.r.judicial, 0));
+  const tot = ['', 'TOTALES', '', '', t.sueldo, t.horasExtra, t.otros, t.bruto, t.ihss, t.rap].concat(hasAfp ? [t.afpEmp] : [], [t.isr, jud, r2(t.otras - jud), t.deducciones, t.neto, t.ihssPat, t.rapPat, t.reservaPat], hasAfp ? [t.afpPat] : [], [t.infop, t.costo]);
   const a1 = [[S.company.name || 'Empresa', '', '', 'Planilla de ' + MESES[m - 1] + ' ' + y], [], head].concat(rows, [tot]);
   const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = colsAuto(a1.slice(2));
-  const h2 = ['Empleado', 'Ingreso anual proyectado', 'Gastos médicos', 'Renta neta gravable', 'ISR anual', 'Retenido antes del mes', 'Meses restantes', 'Retención del mes'];
-  const a2 = [h2].concat(M.act.map(({ emp, r }) => [emp.nombre, r.detalleIsr.proyectado, r.detalleIsr.gastosMedicos, r.detalleIsr.renta, r.detalleIsr.isrAnual, r.detalleIsr.retenidoPrevio, r.detalleIsr.mesesRest, r.isr]));
+  const h2 = ['Empleado', 'Método', 'Ingreso anual (salario × meses, o real en el cierre)', 'Deducción gastos médicos (automática)', 'Renta neta gravable', 'ISR anual', 'Retenido antes del mes', 'Retención del mes'];
+  const a2 = [h2].concat(M.act.map(({ emp, r }) => [emp.nombre, r.detalleIsr.modo === 'cierre' ? 'Ajuste de cierre' : 'Mensual fijo', r.detalleIsr.proyectado, r.detalleIsr.gastosMedicos, r.detalleIsr.renta, r.detalleIsr.isrAnual, r.detalleIsr.retenidoPrevio, r.isr]));
   const w2 = XLSX.utils.aoa_to_sheet(a2); w2['!cols'] = colsAuto(a2);
-  const a3 = [['Parámetro', 'Valor'], ['Año de parámetros', y], ['Exención ISR anual', p.isr.tramos[0].hasta], ['IHSS techo EM', p.ihss.techoEM], ['IHSS techo IVM', p.ihss.techoIVM], ['RAP piso', p.rap.piso], ['RAP tasa empleado', p.rap.tasaEmp], ['INFOP tasa', p.infop.tasa], ['Aviso', 'Prototipo con parámetros por validar con finanzas']];
+  const fil = aportesFilas(t, hasAfp), a4 = [['Concepto', 'Empleado', 'Patrono', 'Total']].concat(fil.map(([c, e, pa]) => [c, e, pa, r2(e + pa)]), [['Total aportes', r2(fil.reduce((a, x) => a + x[1], 0)), r2(fil.reduce((a, x) => a + x[2], 0)), r2(fil.reduce((a, x) => a + x[1] + x[2], 0))], ['ISR retenido (se paga al SAR)', t.isr, 0, t.isr]]);
+  const w4 = XLSX.utils.aoa_to_sheet(a4); w4['!cols'] = [{ wch: 36 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+  const a3 = [['Parámetro', 'Valor'], ['Año de parámetros', y], ['Exención ISR anual', p.isr.tramos[0].hasta], ['IHSS techo EM', p.ihss.techoEM], ['IHSS techo IVM', p.ihss.techoIVM], ['RAP piso', p.rap.piso], ['RAP tasa empleado', p.rap.tasaEmp], ['RAP tasa patrono', p.rap.tasaPat], ['Reserva laboral tasa patrono', p.reserva.tasaPat], ['Reserva laboral techo', p.reserva.techo], ['AFP tasa empleado', p.afp.tasaEmp], ['AFP tasa patrono', p.afp.tasaPat], ['INFOP tasa', p.infop.tasa], ['Deducción gastos médicos', p.isr.gastosMedicosTope], ['Deducción gastos médicos 65+', p.isr.gastosMedicosTope65], ['Aviso', 'Prototipo con parámetros por validar con finanzas']];
   const w3 = XLSX.utils.aoa_to_sheet(a3); w3['!cols'] = [{ wch: 28 }, { wch: 50 }];
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, w1, 'Planilla'); XLSX.utils.book_append_sheet(wb, w2, 'ISR'); XLSX.utils.book_append_sheet(wb, w3, 'Parámetros usados');
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, w1, 'Planilla'); XLSX.utils.book_append_sheet(wb, w4, 'Resumen aportes'); XLSX.utils.book_append_sheet(wb, w2, 'ISR'); XLSX.utils.book_append_sheet(wb, w3, 'Parámetros usados');
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
 }
 function decimosXlsx() {
@@ -821,7 +899,7 @@ function boletasPdf() {
     info.forEach((x, k) => { doc.setFont('helvetica', 'bold'); doc.text(x[0] + ':', 14, 43 + k * 6); doc.setFont('helvetica', 'normal'); doc.text(String(x[1]), 50, 43 + k * 6); });
     const ing = [['Sueldo del mes', fmt(r.sueldo)], ['Horas extra', fmt(r.horasExtra)], ['Bonos', fmt(r.bonos)], ['Comisiones', fmt(r.comisiones)]];
     doc.autoTable({ startY: 84, head: [['INGRESOS', 'L']], body: ing, foot: [['Total ingresos', fmt(r.bruto)]], theme: 'grid', styles: { fontSize: 10 }, headStyles: { fillColor: [31, 95, 191] }, footStyles: { fillColor: [230, 238, 250], textColor: 20 }, columnStyles: { 1: { halign: 'right', cellWidth: 40 } } });
-    const ded = [['IHSS', fmt(r.ihssEmp)], ['RAP', fmt(r.rapEmp)], ['Impuesto sobre la renta (ISR)', fmt(r.isr)], ['Descuento judicial', fmt(r.judicial)], ['Otras deducciones fijas', fmt(r.otrasFijas)], ['Anticipos y otras del mes', fmt(r.anticipos + r.otrasMes)]];
+    const ded = [['IHSS', fmt(r.ihssEmp)], ['RAP', fmt(r.rapEmp)]].concat(r.afpEmp > 0 ? [['AFP', fmt(r.afpEmp)]] : [], [ ['Impuesto sobre la renta (ISR)', fmt(r.isr)], ['Descuento judicial', fmt(r.judicial)], ['Otras deducciones fijas', fmt(r.otrasFijas)], ['Anticipos y otras del mes', fmt(r.anticipos + r.otrasMes)]]);
     doc.autoTable({ startY: doc.lastAutoTable.finalY + 8, head: [['DEDUCCIONES', 'L']], body: ded, foot: [['Total deducciones', fmt(r.deducciones)]], theme: 'grid', styles: { fontSize: 10 }, headStyles: { fillColor: [90, 100, 110] }, footStyles: { fillColor: [240, 238, 232], textColor: 20 }, columnStyles: { 1: { halign: 'right', cellWidth: 40 } } });
     const yy = doc.lastAutoTable.finalY + 12;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('NETO A PAGAR:', 14, yy); doc.text('L ' + fmt(r.neto), 196, yy, { align: 'right' });
@@ -878,7 +956,7 @@ document.addEventListener('click', async ev => {
       readForm(); const errs = validarForm(); ui.form.err = errs;
       if (errs.length) { render(); const el = $('.formcard'); if (el) el.scrollIntoView({ block: 'start' }); break; }
       const f = ui.form, hasta = Math.max(0, Math.min(11, Math.round(num(f.sHasta))));
-      const e = { id: f.id || uid(), nombre: f.nombre.trim(), identidad: digits(f.identidad), cargo: f.cargo.trim(), ingreso: f.ingreso, retiro: f.retiro || '', salario: num(f.salario), jornada: f.jornada, ihss: f.ihss, rap: f.rap, gastosMedicos: num(f.gastosMedicos), descuentoJudicial: num(f.descuentoJudicial), otrasFijas: num(f.otrasFijas), cambios: f.cambios.filter(c => /^\d{4}-\d{2}$/.test(c.desde) && num(c.salario) > 0).map(c => ({ desde: c.desde, salario: num(c.salario) })), saldo: hasta > 0 ? { anio: S.sel.anio, hasta, ingreso: num(f.sIng), isr: num(f.sIsr) } : null };
+      const e = { id: f.id || uid(), nombre: f.nombre.trim(), identidad: digits(f.identidad), cargo: f.cargo.trim(), ingreso: f.ingreso, retiro: f.retiro || '', salario: num(f.salario), jornada: f.jornada, ihss: f.ihss, rap: f.rap, afp: f.afp, fechaNac: f.fechaNac || '', descuentoJudicial: num(f.descuentoJudicial), otrasFijas: num(f.otrasFijas), cambios: f.cambios.filter(c => /^\d{4}-\d{2}$/.test(c.desde) && num(c.salario) > 0).map(c => ({ desde: c.desde, salario: num(c.salario) })), saldo: hasta > 0 ? { anio: S.sel.anio, hasta, ingreso: num(f.sIng), isr: num(f.sIsr) } : null };
       const i = S.employees.findIndex(x => x.id === e.id); if (i >= 0) S.employees[i] = e; else S.employees.push(e);
       save(); ui.form = null; render(); toast('Empleado guardado.'); break;
     }
